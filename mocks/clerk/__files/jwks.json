@@ -1,0 +1,15 @@
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "key_ops": [
+        "verify"
+      ],
+      "n": "zIL00Z2GpfC7EDtmXpwqQhHFn_ZOd74iG-1IWwWEGDbu87v4IIfSJDFI4L0iAFrG9XmbPnr4L7T7mTyYupW_Zo2rcrS3mhZeQXqA3FTYSI0lhXC1OUIdJIKNMTfaVjho5dgov3ERra-gh-HTnYamU0sMuGWkAC0F72JEof0gmVDPZ3nxKxSfHz3agq5tw1RZxhe96mVhWuW13Qb28l2eHU819gmAeeJhE3XX88OYSV7BmminYxhnJxj8SPECF4iPfU4kliUfbP1HOdUrBgII7jiFslA0vZvgekZJoCgU2x8m-kMbypn2x0EaGdfYK7RupoC6RGLyZbQKZ1GzRr5dMw",
+      "e": "AQAB",
+      "kid": "clerk-mock-dev-key",
+      "use": "sig",
+      "alg": "RS256"
+    }
+  ]
+}

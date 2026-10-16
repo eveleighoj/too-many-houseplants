@@ -1,0 +1,48 @@
+# Render Blueprint. Not yet deployed — check values against the Render dashboard before
+# the first sync. Each frontend is its own free static site; the backend is one paid service.
+services:
+  - type: web
+    name: too-many-houseplants-api
+    # Same image as docker compose runs locally (backend/Dockerfile); its CMD listens on $PORT.
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    # Only redeploy when the backend changes.
+    buildFilter:
+      paths: ["backend/**"]
+    # Runs before each deploy goes live; a failed migration stops the deploy.
+    preDeployCommand: python -m houseplants.common.migrations
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      # The Clerk production instance's Frontend API URL, e.g. https://clerk.yourdomain.com
+      - key: AUTH_ISSUER
+        sync: false
+      # The frontends' URLs (Clerk puts the requesting origin in each token's `azp`).
+      - key: AUTH_AUTHORIZED_PARTIES
+        sync: false
+      # Must include each frontend's URL, e.g. https://trips-frontend.onrender.com
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: UKHO_API_KEY
+        sync: false
+
+  - type: web
+    name: trips-frontend
+    runtime: static
+    rootDir: trips-frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: build
+    buildFilter:
+      paths: ["trips-frontend/**"]
+    envVars:
+      # The API's public URL, baked in at build time.
+      - key: VITE_API_URL
+        sync: false
+    # SPA fallback: serve index.html for every path and let the client-side router handle it.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

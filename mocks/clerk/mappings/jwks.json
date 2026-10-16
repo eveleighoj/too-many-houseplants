@@ -1,0 +1,9 @@
+{
+  "name": "JWKS: the public key that clerk-mock's dev tokens are signed with",
+  "request": { "method": "GET", "urlPath": "/.well-known/jwks.json" },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "bodyFileName": "jwks.json"
+  }
+}

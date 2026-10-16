@@ -1,0 +1,16 @@
+{
+  "name": "TidalEvents: a week of tides starting today",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/stations/[^/]+/TidalEvents",
+    "headers": {
+      "Ocp-Apim-Subscription-Key": { "matches": ".+" }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "bodyFileName": "tidal-events.json",
+    "transformers": ["response-template"]
+  }
+}

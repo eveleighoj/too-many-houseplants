@@ -1,0 +1,9 @@
+{
+  "name": "A page listing the dev users' tokens with copy buttons (for the API's /docs)",
+  "request": { "method": "GET", "urlPath": "/" },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "text/html; charset=utf-8" },
+    "bodyFileName": "index.html"
+  }
+}

@@ -1,0 +1,15 @@
+# Secret scanning config (https://github.com/gitleaks/gitleaks): every default rule, plus
+# the allowlist below.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Local-only dev fixtures that look like secrets but aren't"
+paths = [
+  # clerk-mock's dev users' tokens (mocks/clerk/README.md). Deliberately committed so a fresh
+  # clone can log in locally. Only a backend whose AUTH_ISSUER is the mock's
+  # (http://localhost:8082) accepts them, never one configured for Clerk, and the key that
+  # signed them isn't in the repo (mocks/clerk/.gitignore).
+  '''mocks/clerk/__files/dev-users\.json''',
+  '''mocks/clerk/__files/index\.html''',
+]

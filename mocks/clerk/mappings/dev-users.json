@@ -1,0 +1,9 @@
+{
+  "name": "Dev users with ready-made tokens, for the frontends' local login picker",
+  "request": { "method": "GET", "urlPath": "/dev/users" },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "bodyFileName": "dev-users.json"
+  }
+}
