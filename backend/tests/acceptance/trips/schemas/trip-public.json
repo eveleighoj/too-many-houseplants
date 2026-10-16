@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Trip (public view)",
+  "description": "A trip as anyone but its owner sees it: stops and their places are visible, but dates, stays and bookings must always be null.",
+  "type": "object",
+  "required": ["id", "title", "days", "stays", "bookings"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "title": { "type": "string", "minLength": 1 },
+    "days": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["dayNumber", "date", "stops"],
+        "additionalProperties": false,
+        "properties": {
+          "dayNumber": { "type": "integer", "minimum": 1 },
+          "date": { "type": "null" },
+          "stops": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "place"],
+              "additionalProperties": false,
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "place": { "$ref": "place.json" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "stays": { "type": "null" },
+    "bookings": { "type": "null" }
+  }
+}

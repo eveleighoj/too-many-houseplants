@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Place",
+  "description": "Somewhere on the map, as embedded in stops, stays and bookings. Map links are present exactly when the matching place id is.",
+  "type": "object",
+  "required": [
+    "id", "name", "lat", "lng", "address",
+    "googlePlaceId", "applePlaceId", "googleMapsUrl", "appleMapsUrl"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string", "minLength": 1 },
+    "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+    "lng": { "type": "number", "minimum": -180, "maximum": 180 },
+    "address": { "type": ["string", "null"] },
+    "googlePlaceId": { "type": ["string", "null"] },
+    "applePlaceId": { "type": ["string", "null"] },
+    "googleMapsUrl": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "pattern": "^https://www\\.google\\.com/maps/place/\\?q=place_id:.+" }
+      ]
+    },
+    "appleMapsUrl": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "pattern": "^https://maps\\.apple\\.com/place\\?place-id=.+" }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "googlePlaceId": { "type": "null" } } },
+      "then": { "properties": { "googleMapsUrl": { "type": "null" } } },
+      "else": { "properties": { "googleMapsUrl": { "type": "string" } } }
+    },
+    {
+      "if": { "properties": { "applePlaceId": { "type": "null" } } },
+      "then": { "properties": { "appleMapsUrl": { "type": "null" } } },
+      "else": { "properties": { "appleMapsUrl": { "type": "string" } } }
+    }
+  ]
+}

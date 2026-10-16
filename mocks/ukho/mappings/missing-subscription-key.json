@@ -1,0 +1,16 @@
+{
+  "name": "Any request without a subscription key is rejected, like the real API",
+  "priority": 10,
+  "request": {
+    "method": "ANY",
+    "urlPattern": "/.*"
+  },
+  "response": {
+    "status": 401,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "statusCode": 401,
+      "message": "Access denied due to missing subscription key. Make sure to include subscription key when making requests to an API."
+    }
+  }
+}

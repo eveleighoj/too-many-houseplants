@@ -1,0 +1,3 @@
+# The dev signing key never needs committing: __files/ already holds the JWKS and tokens it
+# produced. Regenerating without it (make mock-tokens) makes a new key and matching files.
+dev-key/

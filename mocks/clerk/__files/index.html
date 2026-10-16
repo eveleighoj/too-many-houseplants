@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>clerk-mock dev tokens</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    table { border-collapse: collapse; width: 100%; }
+    td { padding: 0.75rem 0.5rem; border-top: 1px solid #ddd; vertical-align: middle; }
+    button { padding: 0.4rem 0.9rem; cursor: pointer; }
+    code { color: #555; }
+  </style>
+</head>
+<body>
+  <h1>clerk-mock dev tokens</h1>
+  <p>Local development only. In the API's docs (e.g.
+    <a href="http://localhost:8000/trips/docs">/trips/docs</a>) click <strong>Authorize</strong>
+    and paste a token — just the token, Swagger adds "Bearer" itself. Tokens last until 2100.</p>
+  <table>
+      <tr>
+        <td><strong>Demo</strong><br><code>user_demo</code></td>
+        <td><button data-token="eyJhbGciOiJSUzI1NiIsImtpZCI6ImNsZXJrLW1vY2stZGV2LWtleSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyX2RlbW8iLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjgwODIiLCJhenAiOiJodHRwOi8vbG9jYWxob3N0OjUxNzMiLCJpYXQiOjE3NjcyMjU2MDAsIm5iZiI6MTc2NzIyNTYwMCwiZXhwIjo0MTAyNDQ0ODAwfQ.rPvWkXvbY07NnyALKcYCiAsLSuw5UbIXXzv9aUmdPrh3ZyZJhCYXZe5GfCFGevXGhdFfLgYflHnmCUOk7Y5tUTWt2Z1zcVscUKT1tOcReywiLFBM6ZWr4LTO-5utuQN7vouQkyQDzk5Tf9DLen8DETVvCdmnuAKfJ3le0az0OJfSntBouymK-pYPdsekKz41AlwkRRWk6jiwvInQHHaF62DvJfMFr9Q1aIiUc52c6x6EpzwE99HVdWXGBP53QoTs7AnkT6cmVSh7iFUNr60ZMwnldqozgAfYPOHJc8bZyZ6XLi6w0o2ilxZbqNuPHUcvuNyDwu4vF3Nw7sPh6YJc2A">Copy token</button></td>
+      </tr>
+      <tr>
+        <td><strong>Friend</strong><br><code>user_friend</code></td>
+        <td><button data-token="eyJhbGciOiJSUzI1NiIsImtpZCI6ImNsZXJrLW1vY2stZGV2LWtleSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyX2ZyaWVuZCIsImlzcyI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODA4MiIsImF6cCI6Imh0dHA6Ly9sb2NhbGhvc3Q6NTE3MyIsImlhdCI6MTc2NzIyNTYwMCwibmJmIjoxNzY3MjI1NjAwLCJleHAiOjQxMDI0NDQ4MDB9.MZNzp-dkzP6jSIiZYPWnSesWdpvI_Db0RDhjWyh4b-SHljIX7kCnvMuavaF_fWUjTkqS5y57EIg_dbshExoPL0wymNxV5ziSKFReJ5Zsa2k9Nvn2VtAXIXAS2PXpuq_i02oQmr0pHrwRZatYcWCUsujAy90JuN1aCB0O-Ib3CxjtJ7xwJekQ2f_eXUKOqqZH95U7xlCbNdNS-bkVFKe3NICienyTqz9LvcZm720LmidmgrAHhxxwKMOMIyaVi0--JWesr_rgRk01r5pB0LS-FD4z_ZS-4ExfLLmk6kbr95NQ5Dr846r7YVXmbz6V5iNDmIUl5jI1owWuoCx0rR9TnA">Copy token</button></td>
+      </tr>
+  </table>
+  <script>
+    for (const button of document.querySelectorAll("button[data-token]")) {
+      button.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(button.dataset.token);
+        button.textContent = "Copied!";
+        setTimeout(() => (button.textContent = "Copy token"), 1500);
+      });
+    }
+  </script>
+</body>
+</html>
