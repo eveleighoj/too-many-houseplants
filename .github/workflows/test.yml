@@ -1,0 +1,153 @@
+# Checks every PR and every push to main: tests, lint, builds, commit messages and secrets.
+# See docs/contributing.md.
+name: Test
+# How each run is listed in GitHub's Actions tab (the default is just the PR title or the
+# commit message): "PR #12 · feat(trips): add stays" or "main · <commit message>".
+run-name: >-
+  ${{ github.event_name == 'pull_request'
+      && format('PR #{0} · {1}', github.event.pull_request.number, github.event.pull_request.title)
+      || format('{0} · {1}', github.ref_name, github.event.head_commit.message) }}
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same PR or branch cancels the run in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Which parts of the repo changed, so unaffected jobs are skipped (a skipped job counts as
+  # passing for required status checks).
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      trips-frontend: ${{ steps.filter.outputs.trips-frontend }}
+      api-types: ${{ steps.filter.outputs.api-types }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/test.yml'
+            trips-frontend:
+              - 'trips-frontend/**'
+              - '.github/workflows/test.yml'
+            api-types:
+              - 'backend/src/**'
+              - 'trips-frontend/src/lib/api/**'
+              - 'trips-frontend/scripts/generate-api-types.js'
+              - '.github/workflows/test.yml'
+
+  # Every commit the PR adds must be a Conventional Commit, with no merge commits (we
+  # rebase-and-merge, so each commit lands on main as-is).
+  commits:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.3.0
+      - name: Check commit messages
+        run: scripts/check-commits.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Scan history for secrets (gitleaks, .gitleaks.toml)
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.24.0 git /repo --no-banner --redact --config /repo/.gitleaks.toml
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          working-directory: backend
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Lint
+        run: uv run ruff check . && uv run ruff format --check .
+      # Integration and acceptance tests start Postgres with testcontainers (Docker is
+      # available on GitHub's Ubuntu runners).
+      - name: Test
+        run: uv run pytest
+
+  trips-frontend:
+    needs: changes
+    if: needs.changes.outputs.trips-frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: trips-frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: trips-frontend/package-lock.json
+      - run: npm ci
+      - name: Lint and type-check
+        run: npm run lint && npm run check
+      - name: Install Chromium for component tests
+        run: npx playwright install --with-deps chromium
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  # The frontend's generated API types must match the backend's API.
+  api-types:
+    needs: changes
+    if: needs.changes.outputs.api-types == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          working-directory: backend
+          enable-cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Check trips-frontend's API types are up to date
+        run: make api-types-check
+
+  # The single check to require in GitHub's ruleset for main ("Test result"), so new jobs never
+  # need adding there. Passes only if every job above passed or was deliberately skipped:
+  # GitHub counts a skipped job as passing, so without this a failed `changes` job (which skips
+  # everything after it) would let a PR through untested.
+  result:
+    name: Test result
+    if: always()
+    needs: [changes, commits, secrets, backend, trips-frontend, api-types]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any check failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "Job results: ${{ toJSON(needs.*.result) }}"
+          exit 1
+      - run: echo "All checks passed (or were skipped because their part of the repo didn't change)."

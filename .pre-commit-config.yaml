@@ -1,0 +1,12 @@
+# Git hooks (https://pre-commit.com), installed by `make init`.
+# Every commit message must be a Conventional Commit: https://www.conventionalcommits.org
+#   feat(trips): add stays          fix: handle empty trips          docs: explain seeding
+# CI checks every commit in a PR too, and more strictly (no merge or fixup! commits).
+default_install_hook_types: [commit-msg]
+
+repos:
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]

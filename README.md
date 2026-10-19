@@ -29,4 +29,5 @@ make test
 - [docs/frontend.md](docs/frontend.md): the Svelte frontends (trips-frontend)
 - [docs/testing.md](docs/testing.md): unit, integration and acceptance (contract) tests
 - [docs/trips.md](docs/trips.md): the trips data model (places, stops, stays, bookings)
+- [docs/contributing.md](docs/contributing.md): Conventional Commits, rebasing, CI
 - [docs/migrations.md](docs/migrations.md): Alembic chains, making schema changes
