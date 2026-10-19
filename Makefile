@@ -1,4 +1,4 @@
-.PHONY: help init up down logs seed run dev test test-backend test-unit test-integration test-acceptance test-trips-frontend lint format api-types mock-tokens db-up db-down migrate migration
+.PHONY: help init up down logs seed run dev test test-backend test-unit test-integration test-acceptance test-trips-frontend lint format check-commits api-types api-types-check mock-tokens db-up db-down migrate migration
 
 BACKEND := cd backend &&
 TRIPS_FRONTEND := cd trips-frontend &&
@@ -8,8 +8,9 @@ HOST_AUTH := $(if $(shell grep -s '^AUTH_ISSUER=' backend/.env),,AUTH_ISSUER=htt
 help: ## Show available make targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-init: backend/.env ## Install backend (uv) and frontend (npm) dependencies; create backend/.env
+init: backend/.env ## Install dependencies and the commit-message hook; create backend/.env
 	$(BACKEND) uv sync
+	uv run --directory backend pre-commit install
 	$(TRIPS_FRONTEND) npm ci && npx playwright install chromium
 
 backend/.env:
@@ -70,8 +71,19 @@ format: ## Fix lint issues and format, backend and frontend
 	$(BACKEND) uv run ruff check --fix . && uv run ruff format .
 	$(TRIPS_FRONTEND) npm run format
 
+check-commits: ## Check your branch's commits are Conventional Commits, as CI does
+	scripts/check-commits.sh
+
 api-types: ## Regenerate the frontend's API types from the running backend (make up first)
 	$(TRIPS_FRONTEND) npm run api:types
+
+api-types-check: ## Fail if the frontend's API types are out of date with the backend (no server needed)
+	@specs=$$(mktemp -d) && \
+	uv run --directory backend python -m houseplants.export_openapi $$specs > /dev/null && \
+	(cd trips-frontend && API_SPEC_DIR=$$specs npm run --silent api:types > /dev/null) && \
+	rm -rf $$specs && \
+	git diff --exit-code -- trips-frontend/src/lib/api/ || \
+	(echo "The frontend's API types were out of date and have been regenerated above — commit them." && exit 1)
 
 mock-tokens: ## Regenerate clerk-mock's JWKS and dev users' tokens (mocks/clerk/generate.py)
 	$(BACKEND) uv run python ../mocks/clerk/generate.py

@@ -11,6 +11,7 @@ Read the guide for the area you're changing before you change it:
 | --- | --- |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | anything structural. Explains why it's built this way |
 | [docs/backend.md](docs/backend.md) | adding or changing backend code, sub-apps, endpoints, auth, settings |
+| [docs/contributing.md](docs/contributing.md) | committing, branching, rebasing, what CI checks |
 | [docs/frontend.md](docs/frontend.md) | anything in a `*-frontend/` folder: structure, API client, generated types, tests, hosting |
 | [docs/testing.md](docs/testing.md) | writing or changing any backend test |
 | [docs/trips.md](docs/trips.md) | changing the trips data model: places, stops, stays, bookings, redaction |
@@ -29,6 +30,7 @@ make test-unit          # backend unit tests: fast, no Docker
 make test-trips-frontend
 make lint               # ruff + prettier/eslint/svelte-check
 make api-types          # regenerate frontend API types after a backend API change
+make check-commits      # check your branch's commit messages, as CI does
 make format
 make migration chain=trips m="..."   # autogenerate a migration
 make migrate
@@ -68,4 +70,11 @@ Frontend commands (npm) run from their `*-frontend/` folder.
   - Call the API only through `src/lib/api/client.ts` (`authFetch`).
   - Never hand-edit the generated `src/lib/api/*.d.ts`; run `make api-types` instead.
   - Its tests go in `<frontend>/tests/{unit,component}/`.
-- **Before finishing**: run `make lint` and `make test`.
+- **Commits and branches**:
+  - Every commit message is a Conventional Commit (`feat(trips): …`, `fix: …`, `docs: …`).
+  - Update branches with `git rebase origin/main`, never by merging `main` into them; PRs
+    are rebase-merged.
+  - Never edit `.gitignore` so it hides source files. Its Python template's `lib/` rule
+    once hid `trips-frontend/src/lib/`.
+- **Before finishing**: run `make lint` and `make test`. Run `make api-types-check` too if you
+  changed the backend API.
