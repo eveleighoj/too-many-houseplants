@@ -23,17 +23,17 @@ This document summarizes the architecture decisions made for this project, to br
 The backend is **one single FastAPI app/deployment**, not separate FastAPI services per sub-project. Inside that one app, each sub-project (`trips`, `windsurf`, etc.) is its own **mounted sub-application**, each with its own routes, models, and own OpenAPI docs page — but all running in the same process, same container, same deploy.
 
 ```python
-# main.py
+# services/api/main.py
 from fastapi import FastAPI
-from trips.api import app as trips_app
-from windsurf.api import app as windsurf_app
+from api.trips.api import app as trips_app
+from api.windsurf.api import app as windsurf_app
 
 app = FastAPI()
-app.mount("/trips", trips_app)      # docs at /trips/docs
+app.mount("/trips", trips_app)  # docs at /trips/docs
 app.mount("/windsurf", windsurf_app)  # docs at /windsurf/docs
 ```
 
-Each sub-app (`trips/api.py`, `windsurf/api.py`) is its own `FastAPI()` instance with its own routers and its own `/docs` — genuinely separate API surfaces, just **not separately deployed**. This gives clean separation of concerns in code without the operational overhead (and cost) of running multiple containers right now.
+Each sub-app (`services/api/trips/api.py`, `services/api/windsurf/api.py`) is its own `FastAPI()` instance with its own routers and its own `/docs` — genuinely separate API surfaces, just **not separately deployed**. This gives clean separation of concerns in code without the operational overhead (and cost) of running multiple containers right now.
 
 **Planned evolution, explicitly not done yet**: each sub-app is written so it could later be lifted out into its own standalone FastAPI deployment (its own container, own Render service) with minimal change — i.e. avoid tightly coupling sub-apps to each other or to the parent `main.py` beyond the mount point, so a future split to microservices is mechanical rather than a rewrite.
 
@@ -41,37 +41,38 @@ Each frontend (if one exists for a given sub-project) is still its own Svelte ap
 
 ### Repo structure (monorepo, one backend deployment, multiple frontend deployments)
 
+The repo follows the [Repository Structure Conventions](https://gist.github.com/eveleighoj/580410fbfdbac670c8274ffde0049d23)
+(one Python project, Node frontends as npm workspaces). [docs/repository-structure.md](docs/repository-structure.md)
+maps this repo onto them and lists the deliberate deviations.
+
 ```
 repo-root/
-├── backend/              ← one uv project (src layout), one Docker image, one deployment
-│   ├── pyproject.toml
-│   ├── Dockerfile
-│   ├── src/houseplants/
-│   │   ├── main.py       ← mounts all sub-apps, single FastAPI deployment
-│   │   ├── common/       ← small shared helpers (settings, DB session, token verification)
+├── services/
+│   ├── api/                  ← the backend: one Python project, one Docker image, one deployment
+│   │   ├── main.py           ← mounts all sub-apps, single FastAPI deployment
+│   │   ├── common/           ← small shared helpers (settings, DB session, token verification)
 │   │   ├── trips/
-│   │   │   ├── api.py     ← FastAPI() sub-app for trips, own router(s)
+│   │   │   ├── api.py        ← FastAPI() sub-app for trips, own router(s)
 │   │   │   ├── models.py
-│   │   │   └── alembic/    ← own migration chain
-│   │   └── windsurf/
-│   │       ├── api.py     ← FastAPI() sub-app for windsurf (gets an alembic/ chain once it has tables)
-│   │       └── models.py
-│   └── tests/            ← unit/ and integration/ mirror src/; acceptance/ is split by API
-├── trips-frontend/       ← SvelteKit SPA (adapter-static), its own Render static site
-│   ├── src/
-│   ├── tests/            ← unit/ (Node) and component/ (headless browser)
-│   └── package.json
-├── windsurf-frontend/    ← (not built yet)
-│   ├── src/
-│   └── package.json
-├── docs/                ← how-to guides (backend, testing, migrations, local development)
-├── mocks/               ← WireMock stubs standing in for external APIs locally (e.g. mocks/ukho/)
-├── docker-compose.yml   ← local stack: db, migrate, api, external API mocks (+ a service per frontend)
-├── compose.env          ← local defaults for the backend containers (e.g. point UKHO at its mock)
+│   │   │   └── migrations/   ← own migration chain
+│   │   ├── windsurf/
+│   │   │   └── api.py        ← FastAPI() sub-app for windsurf (gets a migrations/ chain once it has tables)
+│   │   └── Dockerfile
+│   ├── trips-frontend/       ← SvelteKit SPA (adapter-static), its own Render static site
+│   └── windsurf-frontend/    ← (not built yet)
+├── tests/
+│   ├── api/                  ← unit/ and integration/ mirror services/api/; acceptance/ is split by sub-app
+│   └── trips-frontend/
+├── scripts/                  ← seed, API-type generation, mock tokens, commit checks (never in images)
+├── docker/                   ← compose defaults, WireMock mocks of external APIs, nginx config
+├── docs/                     ← how-to guides
+├── pyproject.toml, uv.lock   ← the api project
+├── package.json              ← npm workspaces (one per frontend)
+├── docker-compose.yml        ← local stack: db, migrate, api, external API mocks, frontends
 ├── render.yaml
 ├── CLAUDE.md
 ├── README.md
-└── ARCHITECTURE.md      ← this file
+└── ARCHITECTURE.md           ← this file
 ```
 
 Each sub-project keeps its **own Alembic migration chain and own data models** even though they share one running app — this keeps them genuinely independent at the data layer, so splitting into separate deployments later doesn't require untangling shared migrations.
@@ -82,8 +83,8 @@ Reasoning for monorepo (vs. separate repos per sub-project): for a solo/personal
 
 ## Deployment (Render)
 
-- **Backend** → **one** Render **Web Service** (container), paid (~$7/mo), runs the single FastAPI app (`houseplants.main:app`) via uvicorn from `backend/Dockerfile` — the same image docker compose runs locally, with migrations applied as Render's pre-deploy step — hosts all sub-APIs (`/trips/*`, `/windsurf/*`, etc.) from this one service
-- **Frontends** → each deployed as its own Render **Static Site**, free, pointing at its own root directory (`trips-frontend/`, `windsurf-frontend/`) in Render's build settings, serving the built Svelte files (`npm run build` output) from a CDN
+- **Backend** → **one** Render **Web Service** (container), paid (~$7/mo), runs the single FastAPI app (`api.main:app`) via uvicorn from `services/api/Dockerfile` — the same image docker compose runs locally, with migrations applied as Render's pre-deploy step — hosts all sub-APIs (`/trips/*`, `/windsurf/*`, etc.) from this one service
+- **Frontends** → each deployed as its own Render **Static Site**, free, each built from its own workspace (`services/trips-frontend/`, `services/windsurf-frontend/`), serving the built Svelte files from a CDN
 
 ### Static site routing (SPA fallback)
 
@@ -113,14 +114,14 @@ Dynamic content (e.g. which trip, which place) is resolved **entirely client-sid
 - Agents send a bearer token the same way — no special-casing in the API (which Clerk machine-auth option agents use is still to be decided).
 - CORS is configured once, on the single backend app, with an `allow_origins` list covering every frontend's origin (e.g. `trips.yourdomain.com`, `windsurf.yourdomain.com`). No cookies are sent to the API, so credentials stay disabled.
 - Production needs a custom domain: Clerk production instances require one (e.g. Clerk on `clerk.yourdomain.com`, frontends on `trips.yourdomain.com`, the API on `api.yourdomain.com`).
-- **Locally, Clerk is mocked** like every other external service: the `clerk-mock` compose service publishes a JWKS and long-lived tokens for dev users (`mocks/clerk/`), and the frontend's login page lists them. The backend runs exactly the same verification, just trusting the mock's issuer — there is no "auth off" switch that could leak into production.
+- **Locally, Clerk is mocked** like every other external service: the `clerk-mock` compose service publishes a JWKS and long-lived tokens for dev users (`docker/wiremock/clerk/`), and the frontend's login page lists them. The backend runs exactly the same verification, just trusting the mock's issuer — there is no "auth off" switch that could leak into production.
 
 ## Testing
 
-pytest, with three test types under `backend/tests/` — full detail in [docs/testing.md](docs/testing.md):
+pytest, with three test types under `tests/api/` — full detail in [docs/testing.md](docs/testing.md):
 
-- **Unit** — pure logic, no database or network; mirrors `src/houseplants/`.
-- **Integration** — code against a real Postgres (queries, constraints, migrations); mirrors `src/houseplants/`.
+- **Unit** — pure logic, no database or network; mirrors `services/api/`.
+- **Integration** — code against a real Postgres (queries, constraints, migrations); mirrors `services/api/`.
 - **Acceptance** — the whole app over HTTP, split by API, primarily **contract tests**: every response is validated against a hand-written JSON Schema, so the API surface that frontends and agents depend on can't change by accident.
 
 Every test that needs a database gets a throwaway Postgres from **testcontainers** — never the dev database. External HTTP APIs (e.g. UKHO tides) are never called; the client is given a fake transport instead.

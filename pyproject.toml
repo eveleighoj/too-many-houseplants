@@ -1,0 +1,66 @@
+# The api service: the repo's only Python project, so this root file is the project itself
+# and holds all Python tool config (docs/repository-structure.md). Its import package lives in
+# services/api/.
+[project]
+name = "too-many-houseplants-api"
+version = "0.1.0"
+description = "JSON APIs for personal projects, served from one FastAPI app"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.20.0",
+    "fastapi>=0.143.1",
+    "httpx>=0.28.1",
+    "psycopg[binary]>=3.3.6",
+    "pydantic-settings>=2.16.0",
+    "pyjwt[crypto]>=2.15.1",
+    "sqlalchemy>=2.1.4",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13.1",
+    "import-linter",
+    "jsonschema>=4.26.0",
+    "pre-commit>=4.7.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+    "testcontainers[postgres]>=4.15.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# The import package is services/api/ (`import api`), not the default src/<name>/.
+module-root = "services"
+module-name = "api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Default import mode: every folder under tests/ has an __init__.py, so each test module gets a
+# unique dotted name (tests.api.unit...). Don't switch to --import-mode=importlib.
+
+[tool.ruff]
+line-length = 100
+# For import sorting: `api` (services/api), `scripts` and `tests` are first-party.
+src = ["services", "."]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]  # line length is the formatter's job
+
+[tool.importlinter]
+root_packages = ["api"]
+
+[[tool.importlinter.contracts]]
+name = "Sub-apps never import each other"
+type = "independence"
+modules = ["api.trips", "api.windsurf"]
+
+[[tool.importlinter.contracts]]
+name = "Shared code never imports a sub-app"
+type = "forbidden"
+source_modules = ["api.common"]
+forbidden_modules = ["api.trips", "api.windsurf"]

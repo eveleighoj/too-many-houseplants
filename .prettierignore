@@ -1,0 +1,14 @@
+# Package Managers
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+bun.lockb
+
+# Miscellaneous
+services/*-frontend/static/
+**/.svelte-kit/
+**/build/
+
+# Generated from the api's OpenAPI specs (make api-types)
+services/*-frontend/src/lib/api/*.d.ts

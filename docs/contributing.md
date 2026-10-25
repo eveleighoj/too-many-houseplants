@@ -36,7 +36,7 @@ unchanged, so make each commit a meaningful, conventional step.
 ### How it's enforced
 
 - **Locally:** a `commit-msg` hook rejects a badly formatted message before the commit is
-  made. `make init` installs it (`.pre-commit-config.yaml`). It allows `fixup!` commits and
+  made. `make setup` installs it (`.pre-commit-config.yaml`). It allows `fixup!` commits and
   merge commits, so it doesn't get in your way mid-rebase.
 - **In CI:** every commit a PR adds is checked strictly. Merge commits and leftover
   `fixup!` / `squash!` commits fail. Run the same check locally with `make check-commits`.
@@ -76,9 +76,10 @@ part of the repo changed (a skipped job counts as passing):
 | --- | --- | --- |
 | `commits` | every commit in the PR is a Conventional Commit, with no merge commits | `make check-commits` |
 | `secrets` | gitleaks over the whole history (`.gitleaks.toml`) | — |
-| `backend` | ruff lint and format, then every backend test (testcontainers runs Postgres) | `make lint`, `make test-backend` |
-| `trips-frontend` | prettier, eslint, svelte-check, unit and component tests, production build | `make lint`, `make test-trips-frontend` |
-| `api-types` | the frontend's generated API types match the backend's API | `make api-types-check` (fix with `make api-types`) |
+| `layout` | every folder under `tests/` has an `__init__.py` | `make check-test-packages` |
+| `api` | ruff, import-linter boundaries, every api test (testcontainers runs Postgres), then the Docker `test` and `runtime` stages | `make lint`, `make test-api`, `make build` |
+| `frontends` | prettier, eslint, svelte-check, unit and component tests, production builds, Docker images | `make lint`, `make test-frontends`, `make build` |
+| `api-types` | the frontends' generated API types match the api | `make api-types-check` (fix with `make api-types`) |
 | `Test result` | every job above passed or was skipped on purpose; **the one check `main` requires** | — |
 
 ## One-time GitHub settings
