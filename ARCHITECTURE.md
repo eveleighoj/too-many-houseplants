@@ -85,6 +85,8 @@ Reasoning for monorepo (vs. separate repos per sub-project): for a solo/personal
 
 - **Backend** → **one** Render **Web Service** (container), paid (~$7/mo), runs the single FastAPI app (`api.main:app`) via uvicorn from `services/api/Dockerfile` — the same image docker compose runs locally, with migrations applied as Render's pre-deploy step — hosts all sub-APIs (`/trips/*`, `/windsurf/*`, etc.) from this one service
 - **Frontends** → each deployed as its own Render **Static Site**, free, each built from its own workspace (`services/trips-frontend/`, `services/windsurf-frontend/`), serving the built Svelte files from a CDN
+- **Database** → one Render **Postgres** (paid), in the same region (Frankfurt) as the backend, reachable only over Render's private network
+- **Deploys are driven by GitHub, not Render**: Render's auto-deploy is off, and a GitHub Actions **Deploy** workflow deploys `main` after the **Test** workflow passes, waits for each Render deploy to finish, and records it as a GitHub deployment. Deploy status lives in GitHub, so nobody needs Render access to follow it. Setup and runbook: [docs/deployment.md](docs/deployment.md)
 
 ### Static site routing (SPA fallback)
 

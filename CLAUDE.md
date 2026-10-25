@@ -18,6 +18,7 @@ Read the guide for the area you're changing before you change it:
 | [docs/testing.md](docs/testing.md) | writing or changing any test |
 | [docs/trips.md](docs/trips.md) | changing the trips data model or who can see trips: places, stops, stays, bookings, access |
 | [docs/migrations.md](docs/migrations.md) | changing models or the database schema |
+| [docs/deployment.md](docs/deployment.md) | anything about production: Render, domains, Clerk production, the Deploy workflow |
 | [docs/local-development.md](docs/local-development.md) | running things locally, docker compose, mocked external APIs, seed data |
 
 ## Commands

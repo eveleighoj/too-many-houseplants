@@ -31,4 +31,5 @@ make test
 - [docs/testing.md](docs/testing.md): the tests/ layout; unit, integration and acceptance (contract) tests
 - [docs/trips.md](docs/trips.md): the trips data model (places, stops, stays, bookings)
 - [docs/contributing.md](docs/contributing.md): Conventional Commits, rebasing, CI
+- [docs/deployment.md](docs/deployment.md): production on Render and Clerk, and how deploys happen
 - [docs/migrations.md](docs/migrations.md): Alembic chains, making schema changes

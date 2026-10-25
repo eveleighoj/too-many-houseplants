@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { NoAuth, chooseAuthKind } from 'trips-frontend/src/lib/auth/index.ts';
 
 describe('chooseAuthKind', () => {
-	const clerkPublishableKey = 'pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk';
+	// A made-up publishable key (pk_test_ + base64 of the instance's host).
+	const clerkPublishableKey = `pk_test_${btoa('example.clerk.accounts.dev$')}`;
 
 	test('uses Clerk when its publishable key is configured', () => {
 		expect(chooseAuthKind({ clerkPublishableKey, mockAuthUrl: null })).toBe('clerk');
