@@ -33,8 +33,7 @@ describe('tripDateRange', () => {
 		);
 	});
 
-	test('is null when no day has a date', () => {
-		expect(tripDateRange(makeTrip({ days: [makeDay({ date: null })] }))).toBeNull();
+	test('is null for a trip with no days yet', () => {
 		expect(tripDateRange(makeTrip())).toBeNull();
 	});
 });

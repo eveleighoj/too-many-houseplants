@@ -60,13 +60,3 @@ export function makeBooking(overrides: Partial<Booking> = {}): Booking {
 export function makeTrip(overrides: Partial<Trip> = {}): Trip {
 	return { id: id(), title: 'Scotland', days: [], stays: [], bookings: [], ...overrides };
 }
-
-/** The same trip as a non-owner sees it: no dates, stays or bookings. */
-export function redacted(trip: Trip): Trip {
-	return {
-		...trip,
-		days: trip.days.map((day) => ({ ...day, date: null })),
-		stays: null,
-		bookings: null
-	};
-}

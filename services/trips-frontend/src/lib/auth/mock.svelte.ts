@@ -1,8 +1,9 @@
-import { isExpired } from './token';
+import { isExpired } from '../token.ts';
+import type { AuthProvider } from './provider.ts';
 
 const STORAGE_KEY = 'trips.token';
 
-// localStorage can throw (private mode, blocked storage) — treat that as "not logged in".
+// localStorage can throw (private mode, blocked storage) — treat that as "not signed in".
 function load(): string | null {
 	try {
 		const token = localStorage.getItem(STORAGE_KEY);
@@ -21,23 +22,29 @@ function save(token: string | null): void {
 	}
 }
 
-/** The logged-in user's bearer token, kept in localStorage (see ARCHITECTURE.md → Auth). */
-class Auth {
+/** Local development only: sign in as one of clerk-mock's dev users, whose ready-made tokens
+ * the login page lists (docker/wiremock/clerk/). The token is kept in localStorage. */
+export class MockAuth implements AuthProvider {
+	readonly kind = 'mock';
+	readonly loaded = true;
 	token = $state<string | null>(load());
 
-	get loggedIn(): boolean {
+	get signedIn(): boolean {
 		return this.token !== null && !isExpired(this.token);
 	}
 
-	set(token: string): void {
+	async getToken(): Promise<string | null> {
+		return this.signedIn ? this.token : null;
+	}
+
+	/** Sign in with a dev user's token from clerk-mock. */
+	signInAs(token: string): void {
 		this.token = token;
 		save(token);
 	}
 
-	clear(): void {
+	async signOut(): Promise<void> {
 		this.token = null;
 		save(null);
 	}
 }
-
-export const auth = new Auth();

@@ -50,7 +50,7 @@ def test_create_trip_response_matches_contract(
     response = client.post("/trips/", json={"title": "Wales"}, headers=auth_header(owner_id))
 
     assert response.status_code == 201
-    assert_matches_schema(response.json(), "trips/schemas/trip-owner.json")
+    assert_matches_schema(response.json(), "trips/schemas/trip.json")
 
 
 def test_create_trip_without_token_matches_error_contract(client, assert_matches_schema):
@@ -79,6 +79,16 @@ def test_list_trips_response_matches_contract(
     assert [trip["id"] for trip in response.json()["trips"]] == [str(saved_trip.id)]
 
 
+def test_list_trips_includes_other_peoples_trips(
+    client, auth_header, saved_trip, assert_matches_schema
+):
+    response = client.get("/trips/", headers=auth_header("user_friend"))
+
+    assert response.status_code == 200
+    assert_matches_schema(response.json(), "trips/schemas/trip-list.json")
+    assert [trip["id"] for trip in response.json()["trips"]] == [str(saved_trip.id)]
+
+
 def test_list_trips_without_token_matches_error_contract(client, assert_matches_schema):
     response = client.get("/trips/")
 
@@ -86,13 +96,16 @@ def test_list_trips_without_token_matches_error_contract(client, assert_matches_
     assert_matches_schema(response.json(), "common/schemas/error.json")
 
 
-def test_get_trip_as_owner_matches_owner_contract(
-    client, auth_header, saved_trip, owner_id, assert_matches_schema
+@pytest.mark.parametrize("caller", ["owner", "friend"])
+def test_get_trip_as_any_signed_in_user_matches_contract(
+    client, auth_header, saved_trip, owner_id, assert_matches_schema, caller
 ):
-    response = client.get(f"/trips/{saved_trip.id}", headers=auth_header(owner_id))
+    user_id = owner_id if caller == "owner" else "user_friend"
+
+    response = client.get(f"/trips/{saved_trip.id}", headers=auth_header(user_id))
 
     assert response.status_code == 200
-    assert_matches_schema(response.json(), "trips/schemas/trip-owner.json")
+    assert_matches_schema(response.json(), "trips/schemas/trip.json")
     body = response.json()
     assert {b["reference"] for b in body["bookings"]} == {"ABC123", "INN-1", "FERRY-1"}
     place = body["days"][0]["stops"][0]["place"]
@@ -100,31 +113,29 @@ def test_get_trip_as_owner_matches_owner_contract(
     assert place["appleMapsUrl"] == "https://maps.apple.com/place?place-id=Iexample"
 
 
-@pytest.mark.parametrize("caller", ["anonymous", "other-user", "invalid-token"])
-def test_get_trip_as_anyone_else_matches_public_contract(
-    client, auth_header, saved_trip, assert_matches_schema, caller
+@pytest.mark.parametrize(
+    "headers", [{}, {"Authorization": "Bearer not-a-token"}], ids=["no-token", "invalid-token"]
+)
+def test_get_trip_without_a_valid_token_matches_error_contract(
+    client, saved_trip, assert_matches_schema, headers
 ):
-    headers = {
-        "anonymous": {},
-        "other-user": auth_header(uuid.uuid4()),
-        "invalid-token": {"Authorization": "Bearer not-a-token"},
-    }[caller]
-
     response = client.get(f"/trips/{saved_trip.id}", headers=headers)
 
-    assert response.status_code == 200
-    assert_matches_schema(response.json(), "trips/schemas/trip-public.json")
+    assert response.status_code == 401
+    assert_matches_schema(response.json(), "common/schemas/error.json")
 
 
-def test_get_trip_unknown_id_matches_error_contract(client, assert_matches_schema):
-    response = client.get(f"/trips/{uuid.uuid4()}")
+def test_get_trip_unknown_id_matches_error_contract(client, auth_header, assert_matches_schema):
+    response = client.get(f"/trips/{uuid.uuid4()}", headers=auth_header("user_friend"))
 
     assert response.status_code == 404
     assert_matches_schema(response.json(), "common/schemas/error.json")
 
 
-def test_get_trip_malformed_id_matches_validation_error_contract(client, assert_matches_schema):
-    response = client.get("/trips/not-a-uuid")
+def test_get_trip_malformed_id_matches_validation_error_contract(
+    client, auth_header, assert_matches_schema
+):
+    response = client.get("/trips/not-a-uuid", headers=auth_header("user_friend"))
 
     assert response.status_code == 422
     assert_matches_schema(response.json(), "common/schemas/validation-error.json")

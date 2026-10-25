@@ -14,10 +14,8 @@
 
 	let { trip }: { trip: Trip } = $props();
 
-	// The API sends null (not []) for stays and bookings when you aren't the trip's owner.
-	const isOwnerView = $derived(trip.stays !== null && trip.bookings !== null);
-	const stays = $derived(trip.stays ?? []);
-	const bookings = $derived(trip.bookings ?? []);
+	const stays = $derived(trip.stays);
+	const bookings = $derived(trip.bookings);
 	const otherBookings = $derived(unattachedBookings(bookings));
 	const dateRange = $derived(tripDateRange(trip));
 </script>
@@ -28,12 +26,6 @@
 		{#if dateRange}<p class="dates">{dateRange}</p>{/if}
 	</header>
 
-	{#if !isOwnerView}
-		<p class="notice" role="note">
-			This is someone else's trip — dates, stays and bookings are only visible to its owner.
-		</p>
-	{/if}
-
 	{#if trip.days.length === 0}
 		<p class="empty">Nothing planned yet.</p>
 	{/if}
@@ -43,7 +35,7 @@
 			<li class="day">
 				<h2>
 					Day {day.dayNumber}
-					{#if day.date}<span class="date">{formatDate(day.date)}</span>{/if}
+					<span class="date">{formatDate(day.date)}</span>
 				</h2>
 
 				{#if day.stops.length > 0}
@@ -95,12 +87,6 @@
 	.dates {
 		margin: 0.25rem 0 0;
 		color: var(--muted);
-	}
-	.notice {
-		padding: 0.75rem 1rem;
-		border-radius: 6px;
-		background: var(--surface-2);
-		border: 1px solid var(--border);
 	}
 	.empty {
 		color: var(--muted);

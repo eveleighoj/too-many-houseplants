@@ -16,7 +16,7 @@ agent (see [ARCHITECTURE.md](../ARCHITECTURE.md)).
   swapping to `adapter-node`; that's a config change, not a rewrite.
 - **Svelte 5 runes** (`$state`, `$derived`, `$props`, `$effect`) throughout.
 - **TypeScript.** Inside the app, import `src/lib` through the `#lib` alias **with the file
-  extension**, e.g. `import { auth } from '#lib/auth.svelte.ts'`. The alias is a Node subpath
+  extension**, e.g. `import { mapLinks } from '#lib/trips.ts'`. The alias is a Node subpath
   import (SvelteKit 3's replacement for `$lib`), which only resolves exact paths. Tests, which
   live outside the app, import it by package name instead (see Testing).
 
@@ -33,7 +33,12 @@ services/trips-frontend/
 │   ├── app.css               ← colour tokens (light + dark) and base styles
 │   ├── lib/
 │   │   ├── config.ts         ← API_URL, from VITE_API_URL
-│   │   ├── auth.svelte.ts    ← the token: reactive state + localStorage (dev login; Clerk to come)
+│   │   ├── auth/             ← sign-in behind one interface (see Signing in)
+│   │   │   ├── provider.ts   ← the AuthProvider interface the app uses
+│   │   │   ├── index.ts      ← picks the provider for this build; exports `auth`
+│   │   │   ├── clerk.svelte.ts ← Clerk (production, or locally against a Clerk dev instance)
+│   │   │   ├── mock.svelte.ts ← clerk-mock's dev users (local)
+│   │   │   └── none.ts       ← no sign-in configured
 │   │   ├── token.ts          ← pure token helpers (expiry, safe ?next= redirects)
 │   │   ├── navigation.ts     ← goToLogin()
 │   │   ├── trips.ts          ← pure display helpers (dates, nights, booking filters, map links)
@@ -46,7 +51,7 @@ services/trips-frontend/
 │   └── routes/
 │       ├── +page.svelte      ← your trips + create a trip (needs login)
 │       ├── login/            ← log in (clerk-mock's dev users locally), then back to ?next=
-│       └── trips/[id]/       ← one trip; works logged out (redacted view)
+│       └── trips/[id]/       ← one trip
 └── static/
 ```
 
@@ -60,18 +65,49 @@ Prettier, Vitest, Playwright) is shared, in the root `package.json`, with its co
   the user out and redirects to `/login?next=<current page>`, then throws
   `UnauthorizedError`. Callers ignore that error, because the redirect has already
   happened.
-- **Logging in:** users sign in with Clerk (see ARCHITECTURE.md → Auth). Until a Clerk
-  application is configured, the login page only works locally:
-  - With `VITE_MOCK_AUTH_URL` set (compose sets it to clerk-mock), it lists clerk-mock's dev
-    users, and picking one stores that user's token.
-  - Without it, it says sign-in isn't configured.
+- **Every page except `/login` needs sign-in.** `+layout.svelte` sends signed-out visitors
+  to `/login?next=<page>` and doesn't render the page until someone is signed in, so nothing
+  is fetched for them. Signed in, you see every trip (see [trips.md](trips.md#access-a-trusted-group-of-friends-for-now)).
 
-  Never set `VITE_MOCK_AUTH_URL` in a production build.
-- **The token is kept in `localStorage`** (`trips.token`), as ARCHITECTURE.md decides. An
-  expired token counts as logged out.
-- **Anyone can open a trip page.** Logged out, or as someone who isn't the owner, the API
-  returns the redacted view (`stays`/`bookings` are `null`) and `TripDetails` explains
-  what's hidden.
+### Signing in
+
+The app only talks to the `AuthProvider` interface (`src/lib/auth/provider.ts`) through
+`import { auth } from '#lib/auth/index.ts'`. Only `src/lib/auth/` knows which provider is
+behind it, so switching provider (Clerk → anything else) means writing one new implementation.
+
+| `auth.` | Meaning |
+| --- | --- |
+| `kind` | `'clerk'`, `'mock'` or `'none'` |
+| `loaded` | false until the provider knows whether someone is signed in. Clerk loads asynchronously, so **wait for `loaded` before redirecting to /login** |
+| `signedIn` | someone is signed in (reactive) |
+| `getToken()` | a bearer token for the API, or null. Call it for every request: Clerk's tokens last about a minute and it refreshes them. `authFetch` does this for you |
+| `signOut()` | sign out |
+
+Which provider a build gets (`chooseAuthKind` in `index.ts`):
+
+| Build | Provider | Login page |
+| --- | --- | --- |
+| `VITE_CLERK_PUBLISHABLE_KEY` set (production; or locally, see [local-development.md](local-development.md#signing-in-with-your-clerk-development-instance)) | `clerk` | Clerk's sign-in form; afterwards Clerk navigates to `?next=` |
+| otherwise, `VITE_MOCK_AUTH_URL` set (compose sets it to clerk-mock) | `mock` | lists clerk-mock's dev users; picking one stores their token in `localStorage` (`trips.token`) |
+| nothing configured | `none` | says sign-in isn't configured; public pages still work |
+
+Never set `VITE_MOCK_AUTH_URL` in a production build.
+
+#### How Clerk is loaded
+
+`ClerkAuth` loads Clerk's SDK and its prebuilt UI as **scripts from the Clerk instance's own
+domain** (worked out from the publishable key), the way Clerk's script-tag setup does, rather
+than bundling them:
+
+- Clerk's browser build is ~85 KB and fetches the rest on demand. Bundling `@clerk/clerk-js`
+  from npm would add ~500 KB (compressed) to the app.
+- Bundling Clerk's UI (`@clerk/ui`) would pull React into the app.
+
+Both scripts are pinned to exact versions: `CLERK_JS_VERSION` and `CLERK_UI_VERSION` in
+`src/lib/auth/clerk.svelte.ts`. `@clerk/clerk-js` is only a dev dependency, for its TypeScript
+types, so **when you update it, update `CLERK_JS_VERSION` to the same version** (and
+`CLERK_UI_VERSION` to the matching `@clerk/ui`). Clerk's sign-in steps use the URL hash, so
+`/login` needs no extra routes.
 
 ### API types are generated, never written by hand
 
@@ -107,7 +143,7 @@ A frontend's tests live in `tests/<frontend>/`, never next to the code
 | --- | --- | --- |
 | `tests/trips-frontend/unit/` | Node | pure functions in `src/lib` (`trips.ts`, `token.ts`) and the API client, with `fetch` stubbed |
 | `tests/trips-frontend/unit/components/` | real headless Chromium (Vitest browser mode + Playwright) | components, rendered with `vitest-browser-svelte` |
-| `tests/trips-frontend/fixtures.ts` | — | builders for API shapes (`makeTrip`, `makePlace`, `redacted(trip)`, …), typed against the generated API types, so a breaking API change breaks the fixtures |
+| `tests/trips-frontend/fixtures.ts` | — | builders for API shapes (`makeTrip`, `makePlace`, `makeBooking`, …), typed against the generated API types, so a breaking API change breaks the fixtures |
 
 Tests import the app through its **workspace package name**, because `#lib` only resolves
 inside the app's own folder:
@@ -157,7 +193,7 @@ URL to the api's `ALLOWED_ORIGINS`.
 2. Copy the setup from trips-frontend:
    - `ssr = false` in `src/routes/+layout.ts`, and `fallback: 'index.html'` in `vite.config.ts`
    - `vite.config.ts`'s `test.dir`, and both `vitest.*.config.ts` files (renamed for the new app)
-   - `src/lib/{config,auth.svelte,token,navigation}.ts` and the `authFetch` part of
+   - `src/lib/{config,token,navigation}.ts`, `src/lib/auth/`, and the `authFetch` part of
      `api/client.ts`. Each frontend owns its copy, so frontends stay independently deployable.
    - the `Dockerfile`, pointing at the new app.
 3. Create `tests/<name>-frontend/unit/` with an `__init__.py` in each folder.

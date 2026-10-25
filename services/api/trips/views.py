@@ -1,8 +1,7 @@
 """Response shapes, and the pure transformation from ORM rows into them.
 
-Dates, stays and bookings are only included for the trip's owner — day numbers and stops
-(with their places) stay visible either way. No I/O and no auth logic here, which is what
-makes it cheap to unit test thoroughly.
+No I/O and no access decisions here (those are in access.py), which is what makes it cheap
+to unit test thoroughly.
 """
 
 import datetime as dt
@@ -37,7 +36,7 @@ class StopView(View):
 
 class TripDayView(View):
     day_number: int
-    date: dt.date | None = None
+    date: dt.date
     stops: list[StopView]
 
 
@@ -61,9 +60,8 @@ class TripView(View):
     id: str
     title: str
     days: list[TripDayView]
-    # None (not []) for anyone but the owner: "hidden", as opposed to "there aren't any".
-    stays: list[StayView] | None
-    bookings: list[BookingView] | None
+    stays: list[StayView]
+    bookings: list[BookingView]
 
 
 class TripList(View):
@@ -96,20 +94,20 @@ def build_place_view(place: Place) -> PlaceView:
     )
 
 
-def build_trip_view(trip: Trip, is_owner: bool) -> TripView:
+def build_trip_view(trip: Trip) -> TripView:
     return TripView(
         id=str(trip.id),
         title=trip.title,
-        days=[build_trip_day_view(day, is_owner) for day in trip.days],
-        stays=[build_stay_view(stay) for stay in trip.stays] if is_owner else None,
-        bookings=[build_booking_view(booking) for booking in trip.bookings] if is_owner else None,
+        days=[build_trip_day_view(day) for day in trip.days],
+        stays=[build_stay_view(stay) for stay in trip.stays],
+        bookings=[build_booking_view(booking) for booking in trip.bookings],
     )
 
 
-def build_trip_day_view(day: TripDay, is_owner: bool) -> TripDayView:
+def build_trip_day_view(day: TripDay) -> TripDayView:
     return TripDayView(
         day_number=day.day_number,
-        date=day.date if is_owner else None,
+        date=day.date,
         stops=[build_stop_view(stop) for stop in day.stops],
     )
 

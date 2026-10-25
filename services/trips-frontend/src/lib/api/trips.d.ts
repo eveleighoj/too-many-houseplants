@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List your own trips */
+        /** List the trips you can see, newest first */
         get: operations["list_trips__get"];
         put?: never;
         /** Create a trip */
@@ -29,7 +29,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a trip — full detail if you're the owner, redacted otherwise */
+        /** Get a trip */
         get: operations["get_trip__trip_id__get"];
         put?: never;
         post?: never;
@@ -111,8 +111,11 @@ export interface components {
         TripDayView: {
             /** Daynumber */
             dayNumber: number;
-            /** Date */
-            date?: string | null;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
             /** Stops */
             stops: components["schemas"]["StopView"][];
         };
@@ -130,9 +133,9 @@ export interface components {
             /** Days */
             days: components["schemas"]["TripDayView"][];
             /** Stays */
-            stays: components["schemas"]["StayView"][] | null;
+            stays: components["schemas"]["StayView"][];
             /** Bookings */
-            bookings: components["schemas"]["BookingView"][] | null;
+            bookings: components["schemas"]["BookingView"][];
         };
         /** ValidationError */
         ValidationError: {

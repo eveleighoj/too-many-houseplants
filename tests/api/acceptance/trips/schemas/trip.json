@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Trip (owner view)",
-  "description": "A trip as its owner sees it: every day has a real date, and stays and bookings are always lists.",
+  "title": "Trip",
+  "description": "A trip, as every signed-in user sees it: every day has a real date, and stays and bookings are always lists.",
   "type": "object",
   "required": ["id", "title", "days", "stays", "bookings"],
   "additionalProperties": false,

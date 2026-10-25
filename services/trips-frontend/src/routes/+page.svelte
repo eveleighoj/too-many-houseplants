@@ -3,8 +3,6 @@
 	import { resolve } from '$app/paths';
 	import { ApiError, UnauthorizedError, createTrip, listTrips } from '#lib/api/client.ts';
 	import type { Trip } from '#lib/api/types.ts';
-	import { auth } from '#lib/auth.svelte.ts';
-	import { goToLogin } from '#lib/navigation.ts';
 	import { pluralise, tripDateRange } from '#lib/trips.ts';
 
 	let trips = $state<Trip[] | null>(null);
@@ -15,10 +13,6 @@
 	let creating = $state(false);
 
 	$effect(() => {
-		if (!auth.loggedIn) {
-			goToLogin('/');
-			return;
-		}
 		listTrips()
 			.then((result) => (trips = result))
 			.catch((e) => {
@@ -45,9 +39,9 @@
 	}
 </script>
 
-<svelte:head><title>Your trips · Trips</title></svelte:head>
+<svelte:head><title>Trips</title></svelte:head>
 
-<h1>Your trips</h1>
+<h1>Trips</h1>
 
 {#if loadError}
 	<p class="error" role="alert">{loadError}</p>
