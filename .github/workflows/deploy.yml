@@ -1,0 +1,91 @@
+# Deploys main to Render once the Test workflow passes on it, waits for each deploy to finish,
+# and records it as a GitHub deployment of the `production` environment, so deploy status lives
+# in GitHub (repo homepage → Deployments) and nobody needs Render access to see it.
+# One-time setup (Render services, secrets, variables): docs/deployment.md.
+# This repo is public, and so are these logs: nothing here prints Render's logs (see below).
+name: Deploy
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+      && format('Deploy {0} (manual)', github.ref_name)
+      || format('Deploy · {0}', github.event.workflow_run.display_title) }}
+
+on:
+  workflow_run:
+    workflows: [Test]
+    types: [completed]
+    branches: [main]
+  # Redeploy the current main by hand (Actions → Deploy → Run workflow).
+  workflow_dispatch:
+
+# One deploy at a time; a newer one waits rather than cancelling a deploy halfway.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # Only once Render is set up (docs/deployment.md, step 5: until then every run is skipped,
+    # not failed), and only after Test passed on a push to main (not a PR run) or by hand.
+    # The variables are repository variables, not environment ones: a job's `if` is evaluated
+    # before it enters its environment, so it can't see that environment's variables.
+    if: >-
+      vars.RENDER_API_SERVICE_ID != '' && (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+      )
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.TRIPS_FRONTEND_URL }}
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      # The exact commit Test passed on (or main's head, for a manual run).
+      COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+      # Pinned to a release that's had time to settle; bump deliberately.
+      RENDER_CLI_VERSION: 2.28.0
+    steps:
+      - name: Install the Render CLI (checksum verified)
+        run: |
+          base="https://github.com/render-oss/cli/releases/download/v${RENDER_CLI_VERSION}"
+          zip="cli_${RENDER_CLI_VERSION}_linux_amd64.zip"
+          curl -fsSL -o "$zip" "$base/$zip"
+          curl -fsSL -o SHA256SUMS "$base/cli_${RENDER_CLI_VERSION}_SHA256SUMS"
+          grep " ${zip}$" SHA256SUMS | sha256sum -c -
+          unzip -q "$zip" "cli_v${RENDER_CLI_VERSION}"
+          sudo install "cli_v${RENDER_CLI_VERSION}" /usr/local/bin/render
+          render --version
+
+      # Render's output (it streams the deploy's build and start-up logs) goes to a file that never
+      # leaves the runner: this repo is public, so its Actions logs are too, and Render's logs can
+      # hold visitors' IPs, request URLs and error details. GitHub shows each deploy's result;
+      # the details are in the Render dashboard (service → Events / Logs).
+      #
+      # The api first: its migrations run (Render's pre-deploy command) before it goes live,
+      # so the frontend never runs against an older api.
+      - name: Deploy the api
+        id: api
+        run: |
+          render deploys create "${{ vars.RENDER_API_SERVICE_ID }}" --commit "$COMMIT" --wait --confirm -o text > api-deploy.log 2>&1 \
+            || { echo "::error::The api deploy failed. See Render: too-many-houseplants-api → Events / Logs."; exit 1; }
+          echo "The api deploy succeeded."
+
+      - name: Deploy trips-frontend
+        id: trips_frontend
+        run: |
+          render deploys create "${{ vars.RENDER_TRIPS_FRONTEND_SERVICE_ID }}" --commit "$COMMIT" --wait --confirm -o text > trips-frontend-deploy.log 2>&1 \
+            || { echo "::error::The trips-frontend deploy failed. See Render: trips-frontend → Events / Logs."; exit 1; }
+          echo "The trips-frontend deploy succeeded."
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Deploy of \`${COMMIT:0:7}\`"
+            echo "| Service | Result |"
+            echo "| --- | --- |"
+            echo "| api | ${{ steps.api.outcome }} |"
+            echo "| trips-frontend | ${{ steps.trips_frontend.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

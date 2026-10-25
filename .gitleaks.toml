@@ -15,3 +15,8 @@ paths = [
   '''(docker/wiremock|mocks)/clerk/__files/dev-users\.json''',
   '''(docker/wiremock|mocks)/clerk/__files/index\.html''',
 ]
+regexes = [
+  # Clerk *publishable* keys are public by design (they're in every browser bundle). Secret keys
+  # (sk_test_… / sk_live_…) are not allowlisted and stay fully scanned.
+  '''pk_(test|live)_[A-Za-z0-9+/=$]+''',
+]

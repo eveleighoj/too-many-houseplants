@@ -2,8 +2,9 @@
 # against the Render dashboard on the first sync. Each frontend is its own free static site; the
 # api is one paid web service with one paid Postgres database, both in Frankfurt.
 #
-# Deploys wait for the Test workflow's checks to pass on main (autoDeployTrigger: checksPass).
-# Once the GitHub-driven Deploy workflow exists, both switch to `off` and GitHub triggers them.
+# Render never deploys by itself (autoDeployTrigger: off): the Deploy workflow
+# (.github/workflows/deploy.yml) triggers each deploy once Test passes on main, waits for it, and
+# records it in GitHub. Setup steps: docs/deployment.md.
 
 databases:
   - name: too-many-houseplants-db
@@ -28,10 +29,7 @@ services:
     region: frankfurt
     dockerfilePath: ./services/api/Dockerfile
     dockerContext: .
-    autoDeployTrigger: checksPass
-    # Only redeploy when the api changes.
-    buildFilter:
-      paths: ["services/api/**", "pyproject.toml", "uv.lock", ".python-version", ".dockerignore"]
+    autoDeployTrigger: "off"
     # Runs before each deploy goes live; a failed migration stops the deploy.
     preDeployCommand: python -m api.common.migrations
     healthCheckPath: /healthz
@@ -60,9 +58,7 @@ services:
     # An npm workspace: install from the repo root, build just this app.
     buildCommand: npm ci && npm run build -w services/trips-frontend
     staticPublishPath: services/trips-frontend/build
-    autoDeployTrigger: checksPass
-    buildFilter:
-      paths: ["services/trips-frontend/**", "package.json", "package-lock.json"]
+    autoDeployTrigger: "off"
     envVars:
       # The api's public URL, baked in at build time, e.g. https://api.yourdomain.com
       - key: VITE_API_URL

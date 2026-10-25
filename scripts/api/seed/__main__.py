@@ -24,7 +24,7 @@ def main() -> None:
         print("Seeded trips:")
         for trip in trips:
             print(f"  {trip.id}  {trip.title}  (owner {trip.owner_id}, {len(trip.days)} days)")
-        print("Log in as their owners locally via the frontend's login page (clerk-mock).")
+        print("Sign in as any user on the frontend's login page to see them (docs/trips.md).")
 
 
 if __name__ == "__main__":
