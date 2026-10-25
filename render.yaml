@@ -1,14 +1,34 @@
-# Render Blueprint. Not yet deployed — check values against the Render dashboard before
-# the first sync. Each frontend is its own free static site; the backend is one paid service.
+# Render Blueprint (https://render.com/docs/blueprint-spec). Not yet deployed — check values
+# against the Render dashboard on the first sync. Each frontend is its own free static site; the
+# api is one paid web service with one paid Postgres database, both in Frankfurt.
+#
+# Deploys wait for the Test workflow's checks to pass on main (autoDeployTrigger: checksPass).
+# Once the GitHub-driven Deploy workflow exists, both switch to `off` and GitHub triggers them.
+
+databases:
+  - name: too-many-houseplants-db
+    # The smallest paid plan: Render's free Postgres is deleted after 30 days.
+    plan: 0.1c-256mb
+    region: frankfurt
+    # Same major version as local development (docker-compose.yml) and the tests (testcontainers).
+    # Can't be changed after creation; upgrade all three together.
+    postgresMajorVersion: "16"
+    databaseName: houseplant
+    # No outside connections: only services on Render's private network (the api) can reach it.
+    # Add your IP here (CIDR, e.g. 203.0.113.7/32) to connect with pgAdmin.
+    ipAllowList: []
+
 services:
   - type: web
     name: too-many-houseplants-api
-    # Same image as docker compose runs locally (services/api/Dockerfile, built from the repo
-    # root); its runtime stage's CMD listens on $PORT.
+    # Same image as docker compose runs locally: services/api/Dockerfile, built from the repo
+    # root. Render builds its last stage (runtime), whose CMD listens on $PORT.
     runtime: docker
     plan: starter
+    region: frankfurt
     dockerfilePath: ./services/api/Dockerfile
     dockerContext: .
+    autoDeployTrigger: checksPass
     # Only redeploy when the api changes.
     buildFilter:
       paths: ["services/api/**", "pyproject.toml", "uv.lock", ".python-version", ".dockerignore"]
@@ -16,15 +36,19 @@ services:
     preDeployCommand: python -m api.common.migrations
     healthCheckPath: /healthz
     envVars:
+      # The database's internal (private network) URL.
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: too-many-houseplants-db
+          property: connectionString
       # The Clerk production instance's Frontend API URL, e.g. https://clerk.yourdomain.com
       - key: AUTH_ISSUER
         sync: false
-      # The frontends' URLs (Clerk puts the requesting origin in each token's `azp`).
+      # The frontends' URLs (Clerk puts the requesting origin in each token's `azp`),
+      # e.g. https://trips.yourdomain.com
       - key: AUTH_AUTHORIZED_PARTIES
         sync: false
-      # Must include each frontend's URL, e.g. https://trips-frontend.onrender.com
+      # The same frontend URLs, for CORS.
       - key: ALLOWED_ORIGINS
         sync: false
       - key: UKHO_API_KEY
@@ -36,11 +60,15 @@ services:
     # An npm workspace: install from the repo root, build just this app.
     buildCommand: npm ci && npm run build -w services/trips-frontend
     staticPublishPath: services/trips-frontend/build
+    autoDeployTrigger: checksPass
     buildFilter:
       paths: ["services/trips-frontend/**", "package.json", "package-lock.json"]
     envVars:
-      # The API's public URL, baked in at build time.
+      # The api's public URL, baked in at build time, e.g. https://api.yourdomain.com
       - key: VITE_API_URL
+        sync: false
+      # The Clerk production instance's publishable key (pk_live_…). Public, baked in at build.
+      - key: VITE_CLERK_PUBLISHABLE_KEY
         sync: false
     # SPA fallback: serve index.html for every path and let the client-side router handle it.
     routes:
