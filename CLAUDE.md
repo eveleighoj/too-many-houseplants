@@ -16,7 +16,7 @@ Read the guide for the area you're changing before you change it:
 | [docs/contributing.md](docs/contributing.md) | committing, branching, rebasing, what CI checks |
 | [docs/frontend.md](docs/frontend.md) | anything in a `services/*-frontend/` folder: structure, API client, generated types, tests, hosting |
 | [docs/testing.md](docs/testing.md) | writing or changing any test |
-| [docs/trips.md](docs/trips.md) | changing the trips data model: places, stops, stays, bookings, redaction |
+| [docs/trips.md](docs/trips.md) | changing the trips data model or who can see trips: places, stops, stays, bookings, access |
 | [docs/migrations.md](docs/migrations.md) | changing models or the database schema |
 | [docs/local-development.md](docs/local-development.md) | running things locally, docker compose, mocked external APIs, seed data |
 

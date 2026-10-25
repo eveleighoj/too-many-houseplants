@@ -78,31 +78,20 @@ def test_build_place_view_has_no_links_without_ids():
     assert (view.google_maps_url, view.apple_maps_url) == (None, None)
 
 
-def test_build_trip_view_includes_stays_and_bookings_for_owner():
+def test_build_trip_view_includes_days_stays_and_bookings():
     trip = make_trip()
 
-    view = build_trip_view(trip, is_owner=True)
+    view = build_trip_view(trip)
 
+    assert view.id == str(trip.id)
+    assert view.title == "Scotland"
+    assert [stop.place.name for stop in view.days[0].stops] == ["Glencoe"]
     assert [stay.place.name for stay in view.stays] == ["Clachaig Inn"]
     assert [booking.reference for booking in view.bookings] == ["ABC123"]
 
 
-def test_build_trip_view_hides_stays_and_bookings_from_non_owner():
-    view = build_trip_view(make_trip(), is_owner=False)
-
-    assert view.stays is None
-    assert view.bookings is None
-
-
-def test_build_trip_view_shows_stops_to_non_owner():
-    view = build_trip_view(make_trip(), is_owner=False)
-
-    assert view.title == "Scotland"
-    assert [stop.place.name for stop in view.days[0].stops] == ["Glencoe"]
-
-
 def test_build_trip_view_serialises_with_camel_case_keys():
-    body = build_trip_view(make_trip(), is_owner=True).model_dump(mode="json", by_alias=True)
+    body = build_trip_view(make_trip()).model_dump(mode="json", by_alias=True)
 
     assert body["days"][0]["dayNumber"] == 1
     assert body["stays"][0]["firstNight"] == 1
@@ -110,15 +99,18 @@ def test_build_trip_view_serialises_with_camel_case_keys():
     assert "googleMapsUrl" in body["days"][0]["stops"][0]["place"]
 
 
-def test_build_trip_day_view_includes_date_for_owner():
-    assert build_trip_day_view(make_trip().days[0], is_owner=True).date == date(2026, 6, 1)
+def test_build_trip_view_has_empty_lists_for_a_trip_with_nothing_planned():
+    view = build_trip_view(
+        Trip(id=uuid.uuid4(), owner_id="user_x", title="Japan", days=[], stays=[], bookings=[])
+    )
+
+    assert (view.days, view.stays, view.bookings) == ([], [], [])
 
 
-def test_build_trip_day_view_redacts_date_for_non_owner():
-    view = build_trip_day_view(make_trip().days[0], is_owner=False)
+def test_build_trip_day_view_includes_number_and_date():
+    view = build_trip_day_view(make_trip().days[0])
 
-    assert view.date is None
-    assert view.day_number == 1
+    assert (view.day_number, view.date) == (1, date(2026, 6, 1))
 
 
 def test_build_stop_view_includes_id_and_place():

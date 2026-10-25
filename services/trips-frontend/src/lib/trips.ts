@@ -20,7 +20,7 @@ export function formatDate(isoDate: string): string {
 	return `${parts.weekday} ${parts.day} ${parts.month} ${parts.year}`;
 }
 
-/** "14 Nov 2026 – 17 Nov 2026", or null when no day has a date (e.g. the redacted view). */
+/** "14 Nov 2026 – 17 Nov 2026", or null for a trip with no days yet. */
 export function tripDateRange(trip: Trip): string | null {
 	const dates = trip.days.map((day) => day.date).filter((date): date is string => !!date);
 	if (dates.length === 0) return null;

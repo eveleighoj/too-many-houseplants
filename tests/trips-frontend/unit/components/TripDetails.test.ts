@@ -1,15 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import TripDetails from 'trips-frontend/src/lib/components/TripDetails.svelte';
-import {
-	makeBooking,
-	makeDay,
-	makePlace,
-	makeStay,
-	makeStop,
-	makeTrip,
-	redacted
-} from '../../fixtures.ts';
+import { makeBooking, makeDay, makePlace, makeStay, makeStop, makeTrip } from '../../fixtures.ts';
 
 function scotland() {
 	const glenfinnan = makeStop({ place: makePlace({ name: 'Glenfinnan Viaduct' }) });
@@ -65,25 +57,6 @@ describe('TripDetails', () => {
 		await expect.element(screen.getByText('JAC-3301')).toBeVisible();
 		await expect.element(screen.getByRole('heading', { name: 'Other bookings' })).toBeVisible();
 		await expect.element(screen.getByText('FERRY-1')).toBeVisible();
-	});
-
-	test('redacted view explains what is hidden and shows no dates, stays or bookings', async () => {
-		const screen = await render(TripDetails, { trip: redacted(scotland()) });
-
-		await expect.element(screen.getByRole('note')).toHaveTextContent(/only visible to its owner/);
-		await expect.element(screen.getByText('Glenfinnan Viaduct')).toBeVisible();
-		expect(screen.getByText('Sat 14 Nov 2026', { exact: false }).elements()).toHaveLength(0);
-		expect(screen.getByText('Staying at').elements()).toHaveLength(0);
-		for (const reference of ['JAC-3301', 'CLA-48213', 'FERRY-1']) {
-			expect(screen.getByText(reference).elements()).toHaveLength(0);
-		}
-	});
-
-	test('owner view has no redaction notice', async () => {
-		const screen = await render(TripDetails, { trip: scotland() });
-
-		await expect.element(screen.getByText('Glenfinnan Viaduct')).toBeVisible();
-		expect(screen.getByRole('note').elements()).toHaveLength(0);
 	});
 
 	test('says when nothing is planned yet', async () => {

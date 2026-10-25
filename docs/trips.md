@@ -35,21 +35,34 @@ trips ──► trip_days ──► stops        │              │
   - Deleting a stop or stay keeps its bookings, but detaches them (`SET NULL`).
 - **Map links:** the API turns `google_place_id` and `apple_place_id` into `googleMapsUrl` and
   `appleMapsUrl`. Store only the ids, never the URLs.
-- **Redaction:** anyone who isn't the trip's owner (including anonymous callers) gets:
-  - `date: null` on every day
-  - `stays: null` and `bookings: null` (`null` means "hidden", unlike `[]`, which means
-    "none")
-  - stops, with their places, in full.
 
-  This is enforced by the contract in
-  `tests/api/acceptance/trips/schemas/trip-public.json`.
+## Access: a trusted group of friends (for now)
+
+- **Signed out:** nothing. Every trips endpoint needs a bearer token (401 without one), and
+  the frontend shows only `/login`.
+- **Signed in:** **every** trip, in full. Anyone with an account can see everyone's trips.
+- **That makes Clerk's sign-up setting the security boundary.** The Clerk instance must be
+  **invite-only** (Clerk dashboard → Configure → Restrictions → sign-up mode), so only people
+  you invite, or create in the dashboard, can get an account. With open sign-up, anyone could
+  register and see every trip. Set it on each Clerk instance (development and production).
+  Removing or banning a user in Clerk cuts them off as soon as their current token expires
+  (about a minute).
+- **Creating:** a trip is owned by whoever creates it (`owner_id`). Ownership doesn't limit
+  who can see it yet. It's recorded so per-trip sharing can use it later.
+
+All of this is decided in `services/api/trips/access.py` (`visible_trips` and `can_view`), and
+nowhere else. **Per-trip sharing** would replace those two functions with checks against
+new `trip_members` (trip, user, role) and `trip_invites` tables, for example inviting a friend
+by email, with Clerk sending their sign-up invitation. That needs no changes to existing data,
+because every trip already records its owner.
 
 ## Where things live
 
 | File | Contents |
 | --- | --- |
 | `models.py` | the tables above, as SQLAlchemy models |
-| `views.py` | response shapes, map-link builders, and the owner/redacted transformation (pure; unit tested) |
+| `access.py` | who can see which trips (see Access above) |
+| `views.py` | response shapes, map-link builders (pure; unit tested) |
 | `api.py` | endpoints; `_full_trip` eager-loads the whole tree, places included |
 | `alembic.ini`, `migrations/` | this sub-app's migration chain ([migrations.md](migrations.md)) |
 

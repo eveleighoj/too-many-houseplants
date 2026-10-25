@@ -3,13 +3,24 @@
 	import favicon from '#lib/assets/favicon.svg';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { auth } from '#lib/auth.svelte.ts';
+	import { page } from '$app/state';
+	import { auth } from '#lib/auth/index.ts';
+	import { goToLogin } from '#lib/navigation.ts';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
 
+	// Every page except /login needs a signed-in user (see docs/trips.md → Access). Pages
+	// aren't rendered until then, so they never fetch anything for a signed-out visitor.
+	const onLoginPage = $derived(page.url.pathname === resolve('/login'));
+	const canShowPage = $derived(onLoginPage || (auth.loaded && auth.signedIn));
+
+	$effect(() => {
+		if (auth.loaded && !auth.signedIn && !onLoginPage) goToLogin();
+	});
+
 	async function logOut() {
-		auth.clear();
+		await auth.signOut();
 		await goto(resolve('/login'));
 	}
 </script>
@@ -21,16 +32,18 @@
 <header>
 	<nav>
 		<a class="brand" href={resolve('/')}>Trips</a>
-		{#if auth.loggedIn}
+		{#if auth.signedIn}
 			<button class="link" onclick={logOut}>Log out</button>
-		{:else}
-			<a href={resolve('/login')}>Log in</a>
 		{/if}
 	</nav>
 </header>
 
 <main>
-	{@render children()}
+	{#if canShowPage}
+		{@render children()}
+	{:else}
+		<p class="muted">Loading…</p>
+	{/if}
 </main>
 
 <style>
@@ -57,5 +70,8 @@
 	}
 	main {
 		padding-top: 1.5rem;
+	}
+	.muted {
+		color: var(--muted);
 	}
 </style>

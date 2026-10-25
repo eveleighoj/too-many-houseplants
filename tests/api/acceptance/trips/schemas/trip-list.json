@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Trip list",
-  "description": "GET /trips/ — always the caller's own trips, so always the owner view.",
+  "description": "GET /trips/ — every trip the caller can see (currently all of them).",
   "type": "object",
   "required": ["trips"],
   "additionalProperties": false,
   "properties": {
-    "trips": { "type": "array", "items": { "$ref": "trip-owner.json" } }
+    "trips": { "type": "array", "items": { "$ref": "trip.json" } }
   }
 }

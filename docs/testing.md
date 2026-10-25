@@ -26,7 +26,7 @@ make test-api-unit          # fast, no Docker
 make test-api-integration   # needs Docker
 make test-api-acceptance    # needs Docker
 make test-frontends         # every frontend's tests
-uv run pytest tests/api/unit/trips/test_views.py -k redacts   # one file, from the repo root
+uv run pytest tests/api/unit/trips/test_views.py -k camel   # one file, from the repo root
 ```
 
 There are no e2e tests yet. In the conventions, e2e tests are black-box: they run against
@@ -73,7 +73,7 @@ in-process (they import the app), so they aren't e2e.
 **Functions**: `test_<function_name>_<behaviour>`
 
 ```python
-def test_build_trip_view_redacts_dates_for_non_owner(): ...
+def test_build_trip_view_includes_days_stays_and_bookings(): ...
 def test_decode_access_token_rejects_expired_token(): ...
 ```
 
@@ -99,25 +99,25 @@ the Pydantic models: if a code change alters the API's shape, the test fails ins
 contract quietly changing with it.
 
 ```python
-def test_get_trip_as_owner_matches_owner_contract(
-    client, auth_header, saved_trip, owner_id, assert_matches_schema
+def test_get_trip_without_a_valid_token_matches_error_contract(
+    client, saved_trip, assert_matches_schema
 ):
-    response = client.get(f"/trips/{saved_trip.id}", headers=auth_header(owner_id))
+    response = client.get(f"/trips/{saved_trip.id}")
 
-    assert response.status_code == 200
-    assert_matches_schema(response.json(), "trips/schemas/trip-owner.json")
+    assert response.status_code == 401
+    assert_matches_schema(response.json(), "common/schemas/error.json")
 ```
 
 Rules for schemas:
 
 - **`additionalProperties: false` and every key in `required`** (including ones that can be
-  `null`). A new or leaked field then breaks the contract. That matters most for security
-  rules: `trip-public.json` requires dates and bookings to be `null`, so a leak of owner-only
-  data fails the test with a message naming the exact field.
+  `null`). A new or leaked field then breaks the contract, with a message naming the exact
+  field. Test security rules here too: e.g. a trip request without a valid token must match
+  the 401 error contract, not `trip.json`.
 - **Use formats** (`uuid`, `date`, `email`). They're checked.
 - **Cover error responses too.** `common/schemas/error.json` covers `{"detail": "..."}`
   errors, and `common/schemas/validation-error.json` covers 422s.
-- **Reference other schemas by relative path**, e.g. `"$ref": "trip-owner.json"`, or
+- **Reference other schemas by relative path**, e.g. `"$ref": "trip.json"`, or
   `"../../common/schemas/error.json"` across folders. Paths are relative to
   `tests/api/acceptance/`.
 - **Changing a schema means changing the API contract.** Do it only when the API change is

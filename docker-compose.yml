@@ -86,8 +86,11 @@ services:
     environment:
       # Where the browser (on your machine, not in the container) reaches the API.
       VITE_API_URL: http://localhost:8000
-      # The login page lists clerk-mock's dev users (see docker/wiremock/clerk/).
+      # The login page lists clerk-mock's dev users (see docker/wiremock/clerk/)...
       VITE_MOCK_AUTH_URL: http://localhost:8082
+      # ...unless .env sets a Clerk publishable key: then it signs in with that Clerk instance
+      # (see .env.example → "Signing in with a real Clerk instance").
+      VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
     ports:
       - "5173:5173"
     volumes:

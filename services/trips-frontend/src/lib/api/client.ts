@@ -1,4 +1,4 @@
-import { auth } from '../auth.svelte.ts';
+import { auth } from '../auth/index.ts';
 import { API_URL } from '../config.ts';
 import { goToLogin } from '../navigation.ts';
 import type { Trip, TripList } from './types.ts';
@@ -23,12 +23,13 @@ export class UnauthorizedError extends ApiError {
  * them to /login, coming back to the current page afterwards (see ARCHITECTURE.md → Auth). */
 export async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
 	const headers = new Headers(init.headers);
-	if (auth.token) headers.set('Authorization', `Bearer ${auth.token}`);
+	const token = await auth.getToken();
+	if (token) headers.set('Authorization', `Bearer ${token}`);
 
 	const response = await fetch(`${API_URL}${path}`, { ...init, headers });
 
 	if (response.status === 401) {
-		auth.clear();
+		await auth.signOut();
 		await goToLogin();
 		throw new UnauthorizedError();
 	}

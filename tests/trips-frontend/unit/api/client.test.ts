@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 // The real navigation needs a browser; record redirects instead.
 vi.mock('trips-frontend/src/lib/navigation.ts', () => ({ goToLogin: vi.fn() }));
+// A mock-provider session the tests control, whatever this build is configured for.
+vi.mock('trips-frontend/src/lib/auth/index.ts', async () => {
+	const { MockAuth } = await import('trips-frontend/src/lib/auth/mock.svelte.ts');
+	return { auth: new MockAuth() };
+});
 
 import {
 	ApiError,
@@ -11,9 +16,18 @@ import {
 	getTrip,
 	listTrips
 } from 'trips-frontend/src/lib/api/client.ts';
-import { auth } from 'trips-frontend/src/lib/auth.svelte.ts';
+import { auth as configuredAuth } from 'trips-frontend/src/lib/auth/index.ts';
+import type { MockAuth } from 'trips-frontend/src/lib/auth/mock.svelte.ts';
 import { goToLogin } from 'trips-frontend/src/lib/navigation.ts';
 import { makeTrip } from '../../fixtures.ts';
+
+const auth = configuredAuth as MockAuth;
+
+/** A token MockAuth accepts: any JWT-shaped string with an `exp` in the future. */
+function validToken(): string {
+	const payload = btoa(JSON.stringify({ sub: 'user_test', exp: 4102444800 })).replace(/=+$/, '');
+	return `header.${payload}.signature`;
+}
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -33,7 +47,7 @@ function lastRequest(): { url: string; init: RequestInit; headers: Headers } {
 
 beforeEach(() => {
 	vi.stubGlobal('fetch', fetchMock);
-	auth.clear();
+	auth.signOut();
 });
 
 afterEach(() => {
@@ -43,13 +57,13 @@ afterEach(() => {
 
 describe('authFetch', () => {
 	test('attaches the bearer token when logged in', async () => {
-		auth.set('a-token');
+		auth.signInAs(validToken());
 		respond(200, {});
 
 		await authFetch('/trips/');
 
 		expect(lastRequest().url).toBe('http://localhost:8000/trips/');
-		expect(lastRequest().headers.get('Authorization')).toBe('Bearer a-token');
+		expect(lastRequest().headers.get('Authorization')).toBe(`Bearer ${validToken()}`);
 	});
 
 	test('sends no Authorization header when logged out', async () => {
@@ -61,12 +75,12 @@ describe('authFetch', () => {
 	});
 
 	test('on 401 logs out, redirects to login, and throws UnauthorizedError', async () => {
-		auth.set('expired-token');
+		auth.signInAs(validToken());
 		respond(401, { detail: 'authentication required' });
 
 		await expect(authFetch('/trips/')).rejects.toBeInstanceOf(UnauthorizedError);
 
-		expect(auth.token).toBeNull();
+		expect(auth.signedIn).toBe(false);
 		expect(goToLogin).toHaveBeenCalledOnce();
 	});
 

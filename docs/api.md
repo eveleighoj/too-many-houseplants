@@ -93,8 +93,8 @@ backend never handles passwords or logins: it only **verifies** bearer tokens, i
   string (e.g. `owner_id: Mapped[str]`), never as a UUID.
 - **Dependencies for endpoints:**
   - `UserId`: the caller's user id; responds 401 if the token is missing or invalid.
-  - `OptionalUserId`: the user id, or `None` for anonymous callers. Use it for endpoints
-    that serve public and owner views.
+  - `OptionalUserId`: the user id, or `None` for anonymous callers, for an endpoint that
+    should also work signed out. No trips endpoint uses it: trips need sign-in.
 - **Without `AUTH_ISSUER`,** every request is treated as anonymous, and a warning is logged.
 
 | Setting | Locally (docker/compose.env) | Production (Clerk) |

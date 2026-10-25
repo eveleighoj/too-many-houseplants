@@ -105,11 +105,11 @@ To own the demo trips with your own **real** Clerk account instead, set
 | 4. Cornwall surf trip | `00000002-0000-4000-8000-000000000004` | friend |
 
 For example, http://localhost:5173/trips/00000002-0000-4000-8000-000000000001, or
-`curl localhost:8000/trips/00000002-0000-4000-8000-000000000004`. A new sub-app's seed picks
+`curl localhost:8000/trips/00000002-0000-4000-8000-000000000004 -H "Authorization: Bearer $TOKEN"`. A new sub-app's seed picks
 the next free kind (`seed_id` in `scripts/api/seed/ids.py`).
 
-Log in as Demo and open the Cornwall trip to see the **redacted** view (no dates, stays or
-bookings). Log in as Friend to see it in full. Trip dates are relative to the day you seed,
+Signed in as either user, you see all four trips in full (see
+[trips.md](trips.md#access-a-trusted-group-of-friends-for-now)). Trip dates are relative to the day you seed,
 so they always look upcoming. Seed places have no Google/Apple ids, so their map links are
 `null`.
 
@@ -118,6 +118,18 @@ sub-app's seed data is in `scripts/api/seed/<sub-app>.py`, and `scripts/api/seed
 runs them all (`make seed` = `uv run python -m scripts.api.seed`). It refuses to run against
 a non-local database.
 Want a new sub-app's data in the seed? Add its `seed.py` and call it from there.
+
+## Signing in with your Clerk development instance
+
+By default the stack signs in with clerk-mock's dev users, so a fresh clone needs no Clerk
+account. To sign in with the real Clerk development instance instead (its users, its sign-in
+methods, real Clerk tokens), uncomment the five lines in the "Signing in" section of `.env`
+(see `.env.example`), filled in with the instance's Frontend API URL and publishable key, then
+`make up`. Comment them out again, and `make up`, to go back to clerk-mock.
+
+The trips page and the api then work with your Clerk users. The seeded demo trips belong to
+clerk-mock's `user_demo` until you set `SEED_DEMO_USER_ID` (and `SEED_FRIEND_USER_ID`) in `.env`
+to your Clerk users' ids (Clerk dashboard → Users) and re-run `make seed`.
 
 ## Trying the API
 

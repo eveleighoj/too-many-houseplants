@@ -22,6 +22,9 @@ export default defineConfig({
 		// docs/repository-structure.md), and import it through its workspace package name
 		// (`trips-frontend/src/lib/...`). vitest.unit.config.ts and vitest.components.config.ts
 		// define the two test projects; the root vitest.config.ts runs them.
-		dir: fileURLToPath(new URL('../../tests/trips-frontend', import.meta.url))
+		dir: fileURLToPath(new URL('../../tests/trips-frontend', import.meta.url)),
+		// Fixed, so tests never depend on your .env (which may switch sign-in to Clerk). Tests that
+		// need a provider construct one themselves.
+		env: { VITE_CLERK_PUBLISHABLE_KEY: '', VITE_MOCK_AUTH_URL: '', VITE_API_URL: '' }
 	}
 });
