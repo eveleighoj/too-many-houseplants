@@ -1,15 +1,15 @@
 # Deployment
 
 Production runs on [Render](https://render.com) and signs users in with
-[Clerk](https://clerk.com). GitHub drives every deploy. Replace `<domain>` below with the real
-domain.
+[Clerk](https://clerk.com). GitHub drives every deploy. The domain is
+`wehavetoomanyhouseplants.co.uk`, with its DNS at **Cloudflare**.
 
 | What | Where | URL |
 | --- | --- | --- |
-| api (all sub-APIs) | Render web service `too-many-houseplants-api` (Docker, Frankfurt, paid) | `https://api.<domain>` |
+| api (all sub-APIs) | Render web service `too-many-houseplants-api` (Docker, Frankfurt, paid) | `https://api.wehavetoomanyhouseplants.co.uk` |
 | Postgres | Render database `too-many-houseplants-db` (Frankfurt, paid, private network only) | — |
-| trips frontend | Render static site `trips-frontend` (free, CDN) | `https://trips.<domain>` |
-| sign-in | Clerk production instance | `https://clerk.<domain>` (and `accounts.<domain>`) |
+| trips frontend | Render static site `trips-frontend` (free, CDN) | `https://trips.wehavetoomanyhouseplants.co.uk` |
+| sign-in | Clerk production instance | `https://clerk.wehavetoomanyhouseplants.co.uk` (and `accounts.wehavetoomanyhouseplants.co.uk`) |
 
 Everything on Render is defined in `render.yaml`.
 
@@ -32,8 +32,15 @@ Everything on Render is defined in `render.yaml`.
    Deployments), with its status and URL. Nobody needs Render access to see what's live, or
    whether a deploy worked; only investigating a failure needs Render.
 
-Render never deploys by itself (`autoDeployTrigger: "off"`). To redeploy without a new commit
-(e.g. after changing an environment variable), use **Actions → Deploy → Run workflow**.
+Render never deploys by itself (`autoDeployTrigger: "off"`, and the Blueprint's auto-sync is
+off). To redeploy without a new commit (e.g. after changing an environment variable), use
+**Actions → Deploy → Run workflow**.
+
+**Changing `render.yaml`** (services, plans, domains, variables' keys): after the change
+merges and Test passes on `main`, open the Blueprint in Render and click **Manual Sync**. Render
+shows what will change, applies it, and redeploys the services it changed. Removing something
+from the file never deletes it (delete it in Render yourself), and the database's region,
+Postgres version and name can't change after creation.
 
 **Rolling back:** revert the commit on `main` (Test and Deploy then ship the revert), or, in an
 emergency, use Render's **Rollback** on the service's deploy history. Migrations aren't
@@ -57,41 +64,69 @@ take a while to propagate.
 3. Fill in the values it asks for (the `sync: false` variables). You can change them later
    in each service's **Environment** tab:
 
-   | Service | Variable | Value |
-   | --- | --- | --- |
-   | api | `AUTH_ISSUER` | the Clerk production Frontend API URL, `https://clerk.<domain>` (step 4). To start before step 4, use the development instance's, `https://endless-yak-8528.clerk.accounts.dev` |
-   | api | `AUTH_AUTHORIZED_PARTIES` | `https://trips.<domain>` |
-   | api | `ALLOWED_ORIGINS` | `https://trips.<domain>` |
-   | api | `UKHO_API_KEY` | your UKHO Admiralty API key. Leave empty for now and `/windsurf` returns 503 |
-   | trips-frontend | `VITE_API_URL` | `https://api.<domain>` |
-   | trips-frontend | `VITE_CLERK_PUBLISHABLE_KEY` | the Clerk production publishable key, `pk_live_…` (step 4); the `pk_test_…` one to start |
+   You start on Render's own `*.onrender.com` addresses and the Clerk **development** instance.
+   Steps 3 and 4 switch to the domain and to Clerk production. Render shows each service's
+   address once it's created. If a value isn't known yet, enter a placeholder and fix it before
+   the first real deploy (step 6).
+
+   | Service | Variable | To start | Final (after steps 3–4) |
+   | --- | --- | --- | --- |
+   | api | `AUTH_ISSUER` | `https://endless-yak-8528.clerk.accounts.dev` | `https://clerk.wehavetoomanyhouseplants.co.uk` |
+   | api | `AUTH_AUTHORIZED_PARTIES` | the frontend's `https://….onrender.com` address | `https://trips.wehavetoomanyhouseplants.co.uk` |
+   | api | `ALLOWED_ORIGINS` | the frontend's `https://….onrender.com` address | `https://trips.wehavetoomanyhouseplants.co.uk` |
+   | api | `UKHO_API_KEY` | empty (`/windsurf` returns 503) | your UKHO Admiralty API key, when you have one |
+   | trips-frontend | `VITE_API_URL` | the api's `https://….onrender.com` address | `https://api.wehavetoomanyhouseplants.co.uk` |
+   | trips-frontend | `VITE_CLERK_PUBLISHABLE_KEY` | `pk_test_ZW5kbGVzcy15YWstODUyOC5jbGVyay5hY2NvdW50cy5kZXYk` | the production `pk_live_…` key |
 
    `DATABASE_URL` is filled in automatically from the database.
-4. **Apply.** Render creates the database and both services, and deploys them once. Check
-   the api's logs: migrations ran, then `/healthz` passes.
-5. Note each service's id (`srv-…`, in its URL or Settings) for step 5.
+4. **Deploy Blueprint.** Render creates the database and both services (with their custom
+   domains), and deploys each once. Check the api's logs: migrations ran, then `/healthz`
+   passes.
+5. **Turn off the Blueprint's auto-sync:** Blueprint → **Settings → Auto Sync: No**. With it
+   on, every change to `render.yaml` reaching `main` would be applied *and deployed* straight
+   away, bypassing the Deploy workflow (and possibly before Test has passed).
+6. Note each service's id (`srv-…`, in its URL or Settings) for step 5.
 
 ### 3. Domains for the api and frontend
 
-For each service, go to **Settings → Custom Domains → Add**:
+`render.yaml` already declares both custom domains, so the Blueprint adds them to Render.
+Each needs a record in **Cloudflare → DNS → Records** before Render can verify it. Until then,
+the service's **Settings → Custom Domains** shows it as unverified:
 
-| Service | Domain | DNS record at your provider |
+| Service | Domain (in `render.yaml`) | Cloudflare record |
 | --- | --- | --- |
-| api | `api.<domain>` | `CNAME api → <the target Render shows>` |
-| trips-frontend | `trips.<domain>` | `CNAME trips → <the target Render shows>` |
+| api | `api.wehavetoomanyhouseplants.co.uk` | `CNAME`, name `api`, target the api's `….onrender.com` host Render shows, **DNS only** |
+| trips-frontend | `trips.wehavetoomanyhouseplants.co.uk` | `CNAME`, name `trips`, target the static site's `….onrender.com` host Render shows, **DNS only** |
 
-Render verifies them and issues HTTPS certificates automatically. Until DNS is set up, the
-services are also reachable on their `*.onrender.com` URLs.
+Cloudflare specifics:
+
+- **Proxy status: DNS only (grey cloud).** Render verifies the domain and issues its HTTPS
+  certificate by reaching the service directly. Cloudflare's proxy (orange cloud) would
+  intercept that. Leave it grey. You *can* proxy later, once Render shows the certificates as
+  issued, but then SSL/TLS mode must be **Full**. There's no need to.
+- **No `AAAA` records** for these names: Render doesn't support IPv6 yet.
+
+Render verifies them and issues certificates within minutes of the records existing. Then
+update the URLs everywhere (Render variables, and the GitHub `TRIPS_FRONTEND_URL` variable),
+and redeploy:
+
+| Where | Variable | Value |
+| --- | --- | --- |
+| api | `ALLOWED_ORIGINS`, `AUTH_AUTHORIZED_PARTIES` | `https://trips.wehavetoomanyhouseplants.co.uk` |
+| trips-frontend | `VITE_API_URL` | `https://api.wehavetoomanyhouseplants.co.uk` |
+| GitHub (repository variable) | `TRIPS_FRONTEND_URL` | `https://trips.wehavetoomanyhouseplants.co.uk` |
 
 ### 4. Clerk production instance
 
 A production instance is a separate copy of the Clerk application, with its own users and
 settings.
 
-1. In the Clerk dashboard, **Deploy to production**, then enter `<domain>`.
-2. Add the DNS records Clerk lists at your provider: `clerk.<domain>`, `accounts.<domain>`,
-   and email records such as `clkmail` and the DKIM keys. Wait until Clerk shows them as
-   verified.
+1. In the Clerk dashboard, **Deploy to production**, then enter `wehavetoomanyhouseplants.co.uk`.
+2. In Clerk's **Domains** page, it lists the DNS records it needs: `clerk` (the Frontend
+   API), `accounts` (the account portal), and email records such as `clkmail` and two DKIM
+   keys. Add each one in Cloudflare exactly as shown, all as `CNAME`, **DNS only**. Clerk's
+   check fails if they're proxied. Wait until Clerk shows them all as verified (usually
+   minutes; up to 48 hours), then click **Deploy certificates**.
 3. Configure the production instance like development:
    - **Sign-in methods:** email address + password. Social logins such as Apple or Google
      need your **own** credentials in production.
@@ -100,7 +135,7 @@ settings.
      the data private.
    - **Users:** invite or create the people who should have access.
 4. Put the production values into Render, and redeploy (Actions → Deploy → Run workflow):
-   - api: `AUTH_ISSUER=https://clerk.<domain>`
+   - api: `AUTH_ISSUER=https://clerk.wehavetoomanyhouseplants.co.uk`
    - trips-frontend: `VITE_CLERK_PUBLISHABLE_KEY=pk_live_…`
 
 ### 5. GitHub: the `production` environment and deploy settings
@@ -124,19 +159,31 @@ to `main` before Render exists is fine.
    | --- | --- |
    | `RENDER_API_SERVICE_ID` | the api's `srv-…` id. Setting this turns deploys on |
    | `RENDER_TRIPS_FRONTEND_SERVICE_ID` | trips-frontend's `srv-…` id |
-   | `TRIPS_FRONTEND_URL` | the frontend's URL (`https://trips.<domain>`, or its `*.onrender.com` URL until then), shown on each GitHub deployment |
+   | `TRIPS_FRONTEND_URL` | the frontend's URL (`https://trips.wehavetoomanyhouseplants.co.uk`, or its `*.onrender.com` URL until then), shown on each GitHub deployment |
 
 ### 6. First deploy and checks
 
 Run **Actions → Deploy → Run workflow**, then check:
 
-- `https://api.<domain>/healthz` returns `{"status":"ok"}`
-- `https://api.<domain>/trips/` without a token returns **401**
-- `https://trips.<domain>` redirects to `/login` and shows Clerk's sign-in; once signed in,
+- `https://api.wehavetoomanyhouseplants.co.uk/healthz` returns `{"status":"ok"}`
+- `https://api.wehavetoomanyhouseplants.co.uk/trips/` without a token returns **401**
+- `https://trips.wehavetoomanyhouseplants.co.uk` redirects to `/login` and shows Clerk's sign-in; once signed in,
   you see the trips list (empty in production: the seed only runs locally)
 - GitHub's repo page shows a successful **production** deployment.
 
 ## Costs
 
-Paid on Render: the api web service (`starter`) and the database (`0.1c-256mb`). Static sites
-are free. Clerk's free plan covers this. Check Render's pricing page for current amounts.
+Approximate monthly costs, from third-party write-ups of Render's pricing in 2026. Render shows
+the exact price when you create each resource.
+
+| What | Plan | About |
+| --- | --- | --- |
+| api web service | `starter` (512 MB, 0.5 CPU) | $7 |
+| Postgres | Basic 256 MB (`0.1c-256mb`), 1 GB storage (`diskSizeGB: 1`) | $6–7, plus about $0.30 for storage |
+| trips frontend | static site | free |
+| Render workspace | Hobby (one person) | free, with about 5 GB/month of bandwidth included |
+| Clerk | free plan | free |
+| Cloudflare DNS, GitHub Actions (public repo) | — | free |
+
+**About $13–14 a month in total.** Storage is set to 1 GB (`render.yaml`) rather than Basic's
+default 15 GB. It can be increased later, never decreased.
