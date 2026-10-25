@@ -1,4 +1,4 @@
-# Git hooks (https://pre-commit.com), installed by `make init`.
+# Git hooks (https://pre-commit.com), installed by `make setup`.
 # Every commit message must be a Conventional Commit: https://www.conventionalcommits.org
 #   feat(trips): add stays          fix: handle empty trips          docs: explain seeding
 # CI checks every commit in a PR too, and more strictly (no merge or fixup! commits).

@@ -1,10 +1,10 @@
 # Local development
 
-Needs [uv](https://docs.astral.sh/uv/) and Docker.
+Needs [uv](https://docs.astral.sh/uv/), Node 24 and Docker. Run everything from the repo root.
 
 ```bash
-make init                               # uv sync, npm ci, and create backend/.env
-make up                                 # db → migrate → api, on http://localhost:8000
+make setup                              # .venv (uv), node_modules (npm), the commit hook; creates .env
+make up                                 # everything: api on :8000, trips frontend on :5173
 make seed                               # demo trips (re-run any time to reset them)
 ```
 
@@ -18,29 +18,29 @@ make seed                               # demo trips (re-run any time to reset t
 | --- | --- |
 | `db` | Postgres 16 on `localhost:5432` (user/password/db: `houseplant`) |
 | `migrate` | one-shot. Runs every Alembic chain, then exits. `api` waits for it to succeed |
-| `api` | the FastAPI app from `backend/Dockerfile`. `backend/src` is mounted, so code changes reload automatically |
+| `api` | the FastAPI app, from `services/api/Dockerfile`'s runtime stage. `services/api/` is mounted over the installed package (`PYTHONPATH`), so code changes reload automatically |
 | `trips-frontend` | the trips Svelte app's Vite dev server on http://localhost:5173, with hot reload (see [frontend.md](frontend.md)) |
-| `clerk-mock` | WireMock standing in for Clerk, on `localhost:8082`. Serves the JWKS the API verifies tokens against, and ready-made tokens for the dev users (see [mocks/clerk/](../mocks/clerk/README.md)) |
-| `ukho-mock` | WireMock standing in for the UKHO tidal API, on `localhost:8081`. Serves a week of tides starting today (see [mocks/ukho/](../mocks/ukho/README.md)) |
+| `clerk-mock` | WireMock standing in for Clerk, on `localhost:8082`. Serves the JWKS the API verifies tokens against, and ready-made tokens for the dev users (see [docker/wiremock/clerk/](../docker/wiremock/clerk/README.md)) |
+| `ukho-mock` | WireMock standing in for the UKHO tidal API, on `localhost:8081`. Serves a week of tides starting today (see [docker/wiremock/ukho/](../docker/wiremock/ukho/README.md)) |
 
 Rebuild (`make up` does this) after changing dependencies, because they're baked into the
 image. Code changes only need the reload.
 
-The backend containers load two env files, and the later one wins:
+The api containers load two env files, and the later one wins:
 
-1. `compose.env` (committed) holds the local defaults, e.g. pointing UKHO at `ukho-mock`.
-2. `backend/.env` (yours, gitignored) holds your own settings and overrides those defaults.
+1. `docker/compose.env` (committed) holds the local defaults, e.g. pointing UKHO at `ukho-mock`.
+2. `.env` at the repo root (yours, gitignored) holds your own settings and overrides those defaults.
 
-`DATABASE_URL` is always forced to the `db` service, because `backend/.env` points it at
+`DATABASE_URL` is always forced to the `db` service, because `.env` points it at
 `localhost` for running on the host.
 
 ## External APIs are mocked by default
 
-Every external API the backend calls gets a WireMock service in compose, with stubs and
-seeded data in `mocks/<service>/`. The stack then works with no keys and gives the same data
+Every external API the api calls gets a WireMock service in compose, with stubs and
+seeded data in `docker/wiremock/<service>/`. The stack then works with no keys and gives the same data
 every time. Production code doesn't know about the mocks: only the base URL setting changes.
 
-To use the **real** UKHO API instead, uncomment and fill in these lines in `backend/.env`,
+To use the **real** UKHO API instead, uncomment and fill in these lines in `.env`,
 then run `make up`:
 
 ```bash
@@ -51,22 +51,22 @@ UKHO_API_KEY=your-key
 Leave lines you aren't using **commented out**. A blank `UKHO_API_KEY=` would still override
 the mock's key, and `/windsurf` would return 503.
 
-To change the mock data, edit `mocks/ukho/`, then run `docker compose restart ukho-mock`. You
+To change the mock data, edit `docker/wiremock/ukho/`, then run `docker compose restart ukho-mock`. You
 can see the loaded stubs at http://localhost:8081/__admin/mappings.
 
-## Running the backend on the host instead
+## Running the api on the host instead
 
 Useful for a debugger:
 
 ```bash
 make db-up      # only Postgres
 make migrate
-make dev        # uvicorn --reload on :8000, using backend/.env
+make dev        # uvicorn --reload on :8000, using .env
 ```
 
 Don't run this and `make up` at the same time, because both use port 8000.
 
-On the host, `compose.env` isn't loaded, so `/windsurf` returns 503 unless `backend/.env` sets
+On the host, `docker/compose.env` isn't loaded, so `/windsurf` returns 503 unless `.env` sets
 a UKHO key. To use the mock from the host, run `docker compose up -d ukho-mock` and set
 `UKHO_BASE_URL=http://localhost:8081` plus any `UKHO_API_KEY`.
 
@@ -86,7 +86,7 @@ row, and the last block is its number.
 | **Friend** (`user_friend`) | Cornwall surf trip |
 
 To own the demo trips with your own **real** Clerk account instead, set
-`SEED_DEMO_USER_ID=<your Clerk user id>` in `backend/.env` and re-seed.
+`SEED_DEMO_USER_ID=<your Clerk user id>` in `.env` and re-seed.
 
 | Kind (first block) | Numbering (last block) | Example |
 | --- | --- | --- |
@@ -106,15 +106,17 @@ To own the demo trips with your own **real** Clerk account instead, set
 
 For example, http://localhost:5173/trips/00000002-0000-4000-8000-000000000001, or
 `curl localhost:8000/trips/00000002-0000-4000-8000-000000000004`. A new sub-app's seed picks
-the next free kind (`houseplants.common.seeding.seed_id`).
+the next free kind (`seed_id` in `scripts/api/seed/ids.py`).
 
 Log in as Demo and open the Cornwall trip to see the **redacted** view (no dates, stays or
 bookings). Log in as Friend to see it in full. Trip dates are relative to the day you seed,
 so they always look upcoming. Seed places have no Google/Apple ids, so their map links are
 `null`.
 
-Each sub-app keeps its own seed data in `src/houseplants/<sub-app>/seed.py`.
-`src/houseplants/seed.py` runs them all, and refuses to run against a non-local database.
+The seed is a script, not part of the api package, so it never ships in an image: each
+sub-app's seed data is in `scripts/api/seed/<sub-app>.py`, and `scripts/api/seed/__init__.py`
+runs them all (`make seed` = `uv run python -m scripts.api.seed`). It refuses to run against
+a non-local database.
 Want a new sub-app's data in the seed? Add its `seed.py` and call it from there.
 
 ## Trying the API

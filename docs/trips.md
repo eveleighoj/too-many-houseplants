@@ -1,6 +1,6 @@
 # Trips: domain model
 
-The trips sub-app (`backend/src/houseplants/trips/`, Postgres schema `trips`) has these tables:
+The trips sub-app (`services/api/trips/`, Postgres schema `trips`) has these tables:
 
 ```
 places ◄──────────────┬──────────────┬──────────────┐
@@ -42,7 +42,7 @@ trips ──► trip_days ──► stops        │              │
   - stops, with their places, in full.
 
   This is enforced by the contract in
-  `backend/tests/acceptance/trips/schemas/trip-public.json`.
+  `tests/api/acceptance/trips/schemas/trip-public.json`.
 
 ## Where things live
 
@@ -51,7 +51,8 @@ trips ──► trip_days ──► stops        │              │
 | `models.py` | the tables above, as SQLAlchemy models |
 | `views.py` | response shapes, map-link builders, and the owner/redacted transformation (pure; unit tested) |
 | `api.py` | endpoints; `_full_trip` eager-loads the whole tree, places included |
-| `seed.py` | local demo data (see [local-development.md](local-development.md#seed-data)) |
+| `alembic.ini`, `migrations/` | this sub-app's migration chain ([migrations.md](migrations.md)) |
+
 
 Endpoints for creating places, stops, stays and bookings don't exist yet. For now, trips
-only get them through the seed.
+only get them through the seed (`scripts/api/seed/trips.py`).

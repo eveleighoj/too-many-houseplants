@@ -1,7 +1,7 @@
 # Local development stack. See docs/local-development.md.
-#   docker compose up --build    → API on http://localhost:8000 with live reload
-# External APIs are replaced by WireMock services seeded from mocks/ (see compose.env).
-# Each frontend runs its Vite dev server as its own service (see docs/frontend.md).
+#   make up    → API on http://localhost:8000, trips frontend on http://localhost:5173 (live reload)
+# External APIs are replaced by WireMock services stubbed from docker/wiremock/ (see
+# docker/compose.env). Each frontend runs its Vite dev server as its own service.
 
 services:
   db:
@@ -21,17 +21,17 @@ services:
       timeout: 5s
       retries: 15
 
-  # Stands in for the UKHO tidal API; stubs and seeded data in mocks/ukho/.
+  # Stands in for the UKHO tidal API; stubs and seeded data in docker/wiremock/ukho/.
   ukho-mock:
     image: wiremock/wiremock:3.13.1
     command: --disable-banner
     ports:
       - "8081:8080"
     volumes:
-      - ./mocks/ukho:/home/wiremock:ro
+      - ./docker/wiremock/ukho:/home/wiremock:ro
 
   # Stands in for Clerk: serves the JWKS the API verifies tokens against, and ready-made
-  # tokens for the dev users (see mocks/clerk/).
+  # tokens for the dev users (see docker/wiremock/clerk/).
   clerk-mock:
     image: wiremock/wiremock:3.13.1
     # CORS headers on every stub, so the frontend can fetch /dev/users from the browser.
@@ -39,34 +39,36 @@ services:
     ports:
       - "8082:8080"
     volumes:
-      - ./mocks/clerk:/home/wiremock:ro
+      - ./docker/wiremock/clerk:/home/wiremock:ro
 
   # One-shot: applies every sub-app's migrations, then exits. The api waits for it.
   migrate:
-    build: ./backend
-    command: python -m houseplants.common.migrations
-    env_file: [compose.env, backend/.env]
-    environment:
+    build: &api-build
+      context: .
+      dockerfile: services/api/Dockerfile
+      target: runtime
+    command: python -m api.common.migrations
+    env_file: &api-env-files [docker/compose.env, .env]
+    environment: &api-environment
       DATABASE_URL: postgresql://houseplant:houseplant@db:5432/houseplant
-    volumes:
-      # Current source, not what was baked into the image, so new migrations always run.
-      - ./backend/src:/app/src
+      # The image has the api package installed; the mounted source below goes first on the
+      # import path instead, so code (and migration) changes apply without a rebuild.
+      PYTHONPATH: /app/services
+    volumes: &api-source
+      - ./services/api:/app/services/api
     depends_on:
       db:
         condition: service_healthy
 
   api:
-    build: ./backend
-    command: uvicorn houseplants.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir src
-    # Later files win: backend/.env overrides compose.env's defaults.
-    env_file: [compose.env, backend/.env]
-    environment:
-      DATABASE_URL: postgresql://houseplant:houseplant@db:5432/houseplant
+    build: *api-build
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/services/api
+    # Later files win: your .env overrides docker/compose.env's defaults.
+    env_file: *api-env-files
+    environment: *api-environment
     ports:
       - "8000:8000"
-    volumes:
-      # The project is installed editable, so mounting the source gives live reload.
-      - ./backend/src:/app/src
+    volumes: *api-source
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -75,27 +77,30 @@ services:
       clerk-mock:
         condition: service_started
 
-  # The trips Svelte frontend on http://localhost:5173, with hot reload.
+  # The trips Svelte frontend on http://localhost:5173, with hot reload. Runs from the repo root
+  # because it's an npm workspace (one root package.json and lockfile).
   trips-frontend:
     image: node:24
-    working_dir: /app
-    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
+    working_dir: /repo
+    command: sh -c "npm ci && npm run dev -w services/trips-frontend -- --host 0.0.0.0 --port 5173"
     environment:
       # Where the browser (on your machine, not in the container) reaches the API.
       VITE_API_URL: http://localhost:8000
-      # The login page lists clerk-mock's dev users (see mocks/clerk/).
+      # The login page lists clerk-mock's dev users (see docker/wiremock/clerk/).
       VITE_MOCK_AUTH_URL: http://localhost:8082
     ports:
       - "5173:5173"
     volumes:
-      - ./trips-frontend:/app
+      - .:/repo
       # The container's own node_modules: some packages ship native binaries that differ
       # between macOS (your checkout) and Linux (the container).
-      - trips_frontend_node_modules:/app/node_modules
+      - frontend_node_modules:/repo/node_modules
+      - trips_frontend_node_modules:/repo/services/trips-frontend/node_modules
     depends_on:
       - api
       - clerk-mock
 
 volumes:
   db_data:
+  frontend_node_modules:
   trips_frontend_node_modules:

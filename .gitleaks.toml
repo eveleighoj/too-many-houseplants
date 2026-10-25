@@ -6,10 +6,12 @@ useDefault = true
 [allowlist]
 description = "Local-only dev fixtures that look like secrets but aren't"
 paths = [
-  # clerk-mock's dev users' tokens (mocks/clerk/README.md). Deliberately committed so a fresh
+  # clerk-mock's dev users' tokens (docker/wiremock/clerk/README.md). Deliberately committed so a fresh
   # clone can log in locally. Only a backend whose AUTH_ISSUER is the mock's
   # (http://localhost:8082) accepts them, never one configured for Clerk, and the key that
-  # signed them isn't in the repo (mocks/clerk/.gitignore).
-  '''mocks/clerk/__files/dev-users\.json''',
-  '''mocks/clerk/__files/index\.html''',
+  # signed them isn't in the repo (docker/wiremock/clerk/.gitignore).
+  # Matched at both locations: they lived in mocks/clerk/ before the repo restructure, and
+  # CI scans the whole git history, where the old path remains.
+  '''(docker/wiremock|mocks)/clerk/__files/dev-users\.json''',
+  '''(docker/wiremock|mocks)/clerk/__files/index\.html''',
 ]

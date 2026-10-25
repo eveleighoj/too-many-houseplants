@@ -3,16 +3,17 @@
 services:
   - type: web
     name: too-many-houseplants-api
-    # Same image as docker compose runs locally (backend/Dockerfile); its CMD listens on $PORT.
+    # Same image as docker compose runs locally (services/api/Dockerfile, built from the repo
+    # root); its runtime stage's CMD listens on $PORT.
     runtime: docker
     plan: starter
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
-    # Only redeploy when the backend changes.
+    dockerfilePath: ./services/api/Dockerfile
+    dockerContext: .
+    # Only redeploy when the api changes.
     buildFilter:
-      paths: ["backend/**"]
+      paths: ["services/api/**", "pyproject.toml", "uv.lock", ".python-version", ".dockerignore"]
     # Runs before each deploy goes live; a failed migration stops the deploy.
-    preDeployCommand: python -m houseplants.common.migrations
+    preDeployCommand: python -m api.common.migrations
     healthCheckPath: /healthz
     envVars:
       - key: DATABASE_URL
@@ -32,11 +33,11 @@ services:
   - type: web
     name: trips-frontend
     runtime: static
-    rootDir: trips-frontend
-    buildCommand: npm ci && npm run build
-    staticPublishPath: build
+    # An npm workspace: install from the repo root, build just this app.
+    buildCommand: npm ci && npm run build -w services/trips-frontend
+    staticPublishPath: services/trips-frontend/build
     buildFilter:
-      paths: ["trips-frontend/**"]
+      paths: ["services/trips-frontend/**", "package.json", "package-lock.json"]
     envVars:
       # The API's public URL, baked in at build time.
       - key: VITE_API_URL
